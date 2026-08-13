@@ -17,5 +17,6 @@ out/
 .env*
 !.env.example
 
-# Lokal Claude Code-sessionslås - ikke projektindhold
+# Lokal Claude Code-sessionslås/personlige indstillinger - ikke projektindhold
 .claude/scheduled_tasks.lock
+.claude/settings.local.json
