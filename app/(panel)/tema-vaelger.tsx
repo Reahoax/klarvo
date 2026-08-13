@@ -136,8 +136,8 @@ export function TemaVaelger() {
               : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
           }
         >
-          <div className="mb-2 h-12 rounded border border-[#2a2a2d] bg-[#0b0b0c]">
-            <div className="h-3 w-2/3 rounded-t bg-[#161617]" />
+          <div className="mb-2 h-12 overflow-hidden rounded border border-[#2a2a2d] bg-[#0b0b0c]">
+            <div className="h-3 w-2/3 bg-[#161617]" />
           </div>
           <p className="text-sm font-medium text-tekst">Mørk</p>
           <p className="text-xs text-tekst-daempet">Standard</p>
@@ -152,8 +152,8 @@ export function TemaVaelger() {
               : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
           }
         >
-          <div className="mb-2 h-12 rounded border border-[#e3e2de] bg-[#f7f7f5]">
-            <div className="h-3 w-2/3 rounded-t bg-white" />
+          <div className="mb-2 h-12 overflow-hidden rounded border border-[#e3e2de] bg-[#f7f7f5]">
+            <div className="h-3 w-2/3 bg-white" />
           </div>
           <p className="text-sm font-medium text-tekst">Lys</p>
           <p className="text-xs text-tekst-daempet">Fagsystem-stil</p>
