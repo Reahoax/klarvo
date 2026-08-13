@@ -33,10 +33,32 @@ foreslået, ikke bekræftet.
 
 **Sidst foreslået, ikke bekræftet endnu:** Om Vercel skal forbindes til
 GitHub-reposet for auto-deploy ved push (i stedet for manuel `vercel deploy --prod`).
-Ellers intet — Etape 6 og 7B er nu begge færdige (se status-tabellen). Næste
-skridt er sandsynligvis Kontrakt-afdelingen (se nedenfor) eller Etape 10's
-bookingflow — spørg brugeren hvilken, medmindre de allerede har sagt det i en
-senere besked end denne fil.
+Ellers intet — Etape 6 og 7B er nu begge færdige (se status-tabellen), og
+Indstillinger har fået profilbillede-upload + en forklarende pop-op i
+Forretningsregler (se lige nedenfor). Næste skridt er sandsynligvis
+Kontrakt-afdelingen (se nedenfor) eller Etape 10's bookingflow — spørg
+brugeren hvilken, medmindre de allerede har sagt det i en senere besked end
+denne fil.
+
+**Sidste session (2026-08-13, del 2):** Profilbillede-upload i Indstillinger →
+Konto (`profiler.avatar_url`, ny Storage-bucket `profil-billeder`, offentlig,
+5 MB-grænse), vist i brugermenuens cirkel i stedet for forbogstavet når sat.
+Forretningsregler har fået et lille "i"-ikon der åbner en forklarende pop-op
+(én tekst pr. felt, inkl. ringetidsvindue) med en "Jeg har læst det,
+fortsæt"-knap — vises automatisk første gang en bruger åbner fanen
+(`localStorage`-flag `klarvo-forretningsregler-info-laest`), kan genåbnes
+manuelt via ikonet. **Vigtig rettelse fundet undervejs:** "fjern gammelt
+billede"-logikken i både `tema-vaelger.tsx` og den nye avatar-upload fejlede
+stille — en Storage-bucket med kun en DELETE-policy (uden SELECT) kan reelt
+ikke slette noget via Storage API'et, fordi sletning kræver at rækken først er
+synlig for RLS. Løsning: begge buckets (`tema-baggrunde` og `profil-billeder`)
+har nu også en SELECT-policy scoped til `authenticated` — se "Sådan er Storage
+sat op" nedenfor. Testet live med en midlertidig Supabase-bruger (oprettet med
+`crypt()`/`gen_salt('bf')` — husk at sætte alle `*_token`-kolonner til `''`
+frem for `NULL` ved manuel bruger-oprettelse, ellers fejler login med en
+uforklarlig 500 fra GoTrue: "converting NULL to string is unsupported"), samt
+en kolonne-rettighed der manglede (`grant update (avatar_url) on profiler` —
+samme mønster som `navn`, se "Hvordan man ændrer konfiguration").
 
 **Efterspurgt, endnu ikke bygget (brugerens ord, 2026-08-13):** En "Kontrakt"-
 afdeling under Overblik eller Kunder, der gemmer alle kontrakter elektronisk pr.
@@ -128,8 +150,11 @@ Projektet fik sit første git-repo (se "Git" ovenfor). Se "Udover Spec.md" og
   Klarvos B2B-leadgenerering og er udeladt).
 - **Indstillinger** — pop-op (`indstillinger-modal.tsx`, åbnes fra brugermenuen
   i sidebaren) med intern sidebar-navigation (Konto, Udseende, Forretningsregler
-  — sidstnævnte kun for `ejer`, tilføjer nu også ringetidsvindue). Udseende har
-  nu tre valg:
+  — sidstnævnte kun for `ejer`, tilføjer nu også ringetidsvindue). Konto har et
+  profilbillede-upload (Storage-bucket `profil-billeder`, `profiler.avatar_url`),
+  vist i brugermenuens cirkel i stedet for forbogstavet. Forretningsregler har et
+  "i"-ikon der åbner en forklarende pop-op af hvert felt, med en
+  fortsæt-knap — se "Sidste session" ovenfor. Udseende har nu tre valg:
   Mørk, Lys, og **Brugerdefineret** — fuld kontrol over alle 12 CSS-farvevariabler
   (via en custom picker i `farve-vaelger.tsx`, bygget med `react-colorful` efter
   brugerens skærmbillede-reference), paneltransparens (0,3–1, styret af
@@ -230,12 +255,32 @@ Disse er beskrevet i Spec.md afsnit 1. Sådan er de implementeret:
 
 ## Hvordan man ændrer konfiguration
 
-Virksomhedsform-whitelist og import-advarselsgrænse kan nu ændres i UI'et:
-Indstillinger → Forretningsregler (kun `ejer`). Andre dele af `konfiguration`-
-tabellen (fx `sletning_maaneder` — bruges endnu ikke, Etape 12 er ikke bygget;
-ringetidsvindue findes slet ikke som kolonne endnu) justeres stadig direkte i
-Supabase. Brugerens eget navn, adgangskode og udseende ændres i
-Indstillinger → Konto/Udseende (klik på profilen i sidebaren → Indstillinger).
+Virksomhedsform-whitelist, import-advarselsgrænse og ringetidsvindue kan
+ændres i UI'et: Indstillinger → Forretningsregler (kun `ejer`). Andre dele af
+`konfiguration`-tabellen (fx `sletning_maaneder` — bruges endnu ikke, Etape 12
+er ikke bygget) justeres stadig direkte i Supabase. Brugerens eget navn,
+adgangskode, profilbillede og udseende ændres i Indstillinger → Konto/Udseende
+(klik på profilen i sidebaren → Indstillinger). Kolonner der kan skrives fra
+klienten (som `navn` og `avatar_url` på `profiler`) skal have en eksplicit
+`grant update (kolonne) on profiler to authenticated` — se
+`supabase/migrations` eller kør et opslag i `information_schema.column_privileges`
+hvis en gemmeknap fejler med "permission denied for table" på trods af, at RLS
+ser rigtig ud.
+
+## Sådan er Storage sat op
+
+To offentlige buckets, samme mønster: `tema-baggrunde` (baggrundsbilleder til
+brugerdefineret tema) og `profil-billeder` (avatarer, 5 MB-grænse). Begge har:
+
+- **INSERT** og **DELETE**, scoped til `authenticated`, filtreret på `bucket_id`.
+- **SELECT**, også scoped til `authenticated` — *ikke* valgfri selvom bucket'en
+  er offentlig og filer kan læses via den offentlige URL uden den: uden en
+  SELECT-policy kan Storage API'et ikke se rækken, og en `DELETE`/`remove()`
+  fejler stille (svarer 200 med en tom liste, intet bliver faktisk slettet).
+  Det ramte "fjern gammelt billede"-logikken i begge Udseende- og
+  Konto-uploads, indtil det blev opdaget og rettet 2026-08-13. Ingen SELECT
+  for `anon` — kun autentificerede kan liste filnavne, offentlig læsning sker
+  udelukkende via `/storage/v1/object/public/...`, som ikke er RLS-styret.
 
 ## Teknisk stack
 

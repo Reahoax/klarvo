@@ -28,6 +28,32 @@ export async function opdaterNavn(
   return { ok: true };
 }
 
+// Selve upload til Storage sker klient-side (se KontoSektion i indstillinger-modal.tsx),
+// ligesom brugerdefineret baggrundsbillede - denne action gemmer blot den
+// resulterende offentlige URL på profilen.
+export async function opdaterAvatar(
+  _forrigeState: { fejl?: string; ok?: boolean } | null,
+  formData: FormData
+): Promise<{ fejl?: string; ok?: boolean }> {
+  const avatarUrl = String(formData.get("avatar_url") ?? "").trim();
+  const supabase = await opretServerKlient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return { fejl: "Ikke logget ind." };
+
+  const { error } = await supabase
+    .from("profiler")
+    .update({ avatar_url: avatarUrl || null })
+    .eq("id", user.id);
+
+  if (error) return { fejl: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function skiftAdgangskode(
   _forrigeState: { fejl?: string; ok?: boolean } | null,
   formData: FormData

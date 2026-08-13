@@ -15,7 +15,7 @@ export default async function PanelLayout({
   } = await supabase.auth.getUser();
 
   const { data: profil } = user
-    ? await supabase.from("profiler").select("rolle, navn").eq("id", user.id).single()
+    ? await supabase.from("profiler").select("rolle, navn, avatar_url").eq("id", user.id).single()
     : { data: null };
 
   const erEjer = profil?.rolle === "ejer";
@@ -54,6 +54,7 @@ export default async function PanelLayout({
           email={user?.email}
           rolle={profil?.rolle ?? "operator"}
           navn={profil?.navn ?? null}
+          avatarUrl={profil?.avatar_url ?? null}
           konfiguration={konfiguration}
           forbogstav={forbogstav}
           logUd={logUd}

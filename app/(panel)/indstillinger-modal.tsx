@@ -1,8 +1,16 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { opdaterNavn, skiftAdgangskode, gemForretningsregler } from "./indstillinger-actions";
+import {
+  opdaterNavn,
+  opdaterAvatar,
+  skiftAdgangskode,
+  gemForretningsregler,
+} from "./indstillinger-actions";
 import { TemaVaelger } from "./tema-vaelger";
+import { opretBrowserKlient } from "@/lib/supabase/client";
+
+const AVATAR_BUCKET = "profil-billeder";
 
 type Konfiguration = {
   tilladte_virksomhedsformer: string[];
@@ -33,12 +41,14 @@ export function IndstillingerModal({
   email,
   rolle,
   navn,
+  avatarUrl,
   konfiguration,
   onLuk,
 }: {
   email: string | undefined;
   rolle: string;
   navn: string | null;
+  avatarUrl: string | null;
   konfiguration: Konfiguration;
   onLuk: () => void;
 }) {
@@ -97,7 +107,9 @@ export function IndstillingerModal({
             </button>
           </div>
           <div className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
-            {sektion === "konto" && <KontoSektion email={email} rolle={rolle} navn={navn} />}
+            {sektion === "konto" && (
+              <KontoSektion email={email} rolle={rolle} navn={navn} avatarUrl={avatarUrl} />
+            )}
             {sektion === "udseende" && <UdseendeSektion />}
             {sektion === "forretningsregler" && erEjer && (
               <ForretningsreglerSektion konfiguration={konfiguration} />
@@ -113,13 +125,65 @@ function KontoSektion({
   email,
   rolle,
   navn,
+  avatarUrl,
 }: {
   email: string | undefined;
   rolle: string;
   navn: string | null;
+  avatarUrl: string | null;
 }) {
   const [navnState, navnAction, navnPending] = useActionState(opdaterNavn, null);
   const [kodeState, kodeAction, kodePending] = useActionState(skiftAdgangskode, null);
+  const [avatarState, avatarAction] = useActionState(opdaterAvatar, null);
+  const [visAvatarUrl, setVisAvatarUrl] = useState(avatarUrl);
+  const [avatarUploader, setAvatarUploader] = useState(false);
+  const [avatarFejl, setAvatarFejl] = useState<string | null>(null);
+  const forbogstav = (navn || email || "?").slice(0, 1).toUpperCase();
+
+  async function haandterAvatarUpload(fil: File) {
+    if (fil.size > 5 * 1024 * 1024) {
+      setAvatarFejl("Billedet må maks. være 5 MB.");
+      return;
+    }
+    setAvatarUploader(true);
+    setAvatarFejl(null);
+    try {
+      const supabase = opretBrowserKlient();
+      const endelse = fil.name.split(".").pop() || "jpg";
+      const sti = `${crypto.randomUUID()}.${endelse}`;
+      const { error: uploadError } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(sti, fil, { upsert: false });
+      if (uploadError) {
+        setAvatarFejl(uploadError.message);
+        return;
+      }
+      const forrigeSti = visAvatarUrl ? visAvatarUrl.split(`${AVATAR_BUCKET}/`)[1] : null;
+      const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(sti);
+      const form = new FormData();
+      form.set("avatar_url", data.publicUrl);
+      avatarAction(form);
+      setVisAvatarUrl(data.publicUrl);
+      if (forrigeSti) {
+        await supabase.storage.from(AVATAR_BUCKET).remove([forrigeSti]);
+      }
+    } finally {
+      setAvatarUploader(false);
+    }
+  }
+
+  async function fjernAvatar() {
+    if (!visAvatarUrl) return;
+    const forrigeSti = visAvatarUrl.split(`${AVATAR_BUCKET}/`)[1];
+    const form = new FormData();
+    form.set("avatar_url", "");
+    avatarAction(form);
+    setVisAvatarUrl(null);
+    if (forrigeSti) {
+      const supabase = opretBrowserKlient();
+      await supabase.storage.from(AVATAR_BUCKET).remove([forrigeSti]);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -127,6 +191,51 @@ function KontoSektion({
         <h1 className="mb-4 text-lg font-semibold text-tekst">Konto</h1>
         <p className="text-sm text-tekst">{email}</p>
         <p className="text-xs text-tekst-daempet">{rolle === "ejer" ? "Ejer" : "Operatør"}</p>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-tekst-daempet">
+          Profilbillede
+        </h2>
+        <div className="flex items-center gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-flade-haevet text-lg font-medium text-tekst">
+            {visAvatarUrl ? (
+              <img src={visAvatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              forbogstav
+            )}
+          </span>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex gap-2">
+              <label className="inline-block w-fit cursor-pointer rounded-md border border-kant px-3 py-1.5 text-xs text-tekst transition-colors hover:border-accent">
+                {avatarUploader ? "Uploader…" : visAvatarUrl ? "Skift billede" : "Vælg billede"}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  disabled={avatarUploader}
+                  onChange={(e) => {
+                    const fil = e.target.files?.[0];
+                    if (fil) haandterAvatarUpload(fil);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {visAvatarUrl && (
+                <button
+                  type="button"
+                  onClick={fjernAvatar}
+                  className="rounded-md border border-kant px-2.5 py-1.5 text-xs text-tekst transition-colors hover:border-spaerret hover:text-spaerret"
+                >
+                  Fjern
+                </button>
+              )}
+            </div>
+            {avatarFejl && <p className="text-xs text-spaerret">{avatarFejl}</p>}
+            {avatarState?.fejl && <p className="text-xs text-spaerret">{avatarState.fejl}</p>}
+            <p className="text-xs text-tekst-daempet">JPG, PNG, WebP eller GIF, maks. 5 MB.</p>
+          </div>
+        </div>
       </section>
 
       <section>
@@ -196,12 +305,96 @@ function UdseendeSektion() {
   );
 }
 
+const FORRETNINGSREGLER_INFO_NOEGLE = "klarvo-forretningsregler-info-laest";
+
+const FORRETNINGSREGLER_INFO: { titel: string; forklaring: string }[] = [
+  {
+    titel: "Tilladte virksomhedsformer",
+    forklaring:
+      "Kun leads med en af disse virksomhedsformer (fx ApS, A/S) slipper igennem R4-filteret ved CSV-import. Alt andet frasorteres automatisk.",
+  },
+  {
+    titel: "Virksomhedsformer for fysiske personer",
+    forklaring:
+      "Virksomhedsformer der reelt drives af en privatperson (fx Enkeltmandsvirksomhed). Står en af disse i listen ovenfor, viser importsiden en advarsel om at tjekke Robinsonlisten, da personen kan have frabedt sig markedsføring.",
+  },
+  {
+    titel: "Import-advarselsgrænse",
+    forklaring:
+      "Et loft for det samlede antal leads i systemet. Ville en import bringe det samlede antal over denne grænse, viser importsiden en advarsel, så en stor fejlagtig import ikke sker ved et uheld.",
+  },
+  {
+    titel: "Ringetidsvindue",
+    forklaring:
+      "De tidspunkter og ugedage hvor Ringelisten må vises og bruges til opkald. Uden for vinduet skjules listen helt for alle brugere, så I overholder markedsføringslovens ringetidsregler.",
+  },
+];
+
+function ForretningsreglerInfoPopup({ onLuk }: { onLuk: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" aria-hidden />
+      <div className="relative flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-kant bg-flade shadow-2xl shadow-black/50">
+        <div className="border-b border-kant px-5 py-4">
+          <h2 className="text-base font-semibold text-tekst">Hvad betyder felterne?</h2>
+          <p className="mt-1 text-xs text-tekst-daempet">
+            En kort forklaring af hver indstilling i Forretningsregler, før du ændrer dem.
+          </p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          <dl className="flex flex-col gap-4">
+            {FORRETNINGSREGLER_INFO.map((punkt) => (
+              <div key={punkt.titel}>
+                <dt className="text-sm font-medium text-tekst">{punkt.titel}</dt>
+                <dd className="mt-0.5 text-sm text-tekst-daempet">{punkt.forklaring}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div className="border-t border-kant px-5 py-3.5">
+          <button
+            type="button"
+            onClick={onLuk}
+            className="glow-accent w-full rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-tekst"
+          >
+            Jeg har læst det, fortsæt
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfiguration }) {
   const [state, action, pending] = useActionState(gemForretningsregler, null);
+  const [infoAaben, setInfoAaben] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem(FORRETNINGSREGLER_INFO_NOEGLE)) {
+      setInfoAaben(true);
+    }
+  }, []);
+
+  function lukInfo() {
+    localStorage.setItem(FORRETNINGSREGLER_INFO_NOEGLE, "1");
+    setInfoAaben(false);
+  }
 
   return (
     <div>
-      <h1 className="mb-1 text-lg font-semibold text-tekst">Forretningsregler</h1>
+      {infoAaben && <ForretningsreglerInfoPopup onLuk={lukInfo} />}
+      <div className="mb-1 flex items-center gap-1.5">
+        <h1 className="text-lg font-semibold text-tekst">Forretningsregler</h1>
+        <button
+          type="button"
+          onClick={() => setInfoAaben(true)}
+          title="Hvad betyder felterne?"
+          aria-label="Hvad betyder felterne?"
+          className="flex h-4 w-4 items-center justify-center rounded-full border border-tekst-daempet text-[10px] font-semibold leading-none text-tekst-daempet transition-colors hover:border-accent hover:text-accent"
+        >
+          i
+        </button>
+      </div>
       <p className="mb-4 text-sm text-tekst-daempet">
         Styrer R4-filteret ved CSV-import (Leads → Importér leads). Kun synlig for ejere.
       </p>

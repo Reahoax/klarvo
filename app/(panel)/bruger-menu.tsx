@@ -16,6 +16,7 @@ export function BrugerMenu({
   email,
   rolle,
   navn,
+  avatarUrl,
   konfiguration,
   forbogstav,
   logUd,
@@ -23,6 +24,7 @@ export function BrugerMenu({
   email: string | undefined;
   rolle: string;
   navn: string | null;
+  avatarUrl: string | null;
   konfiguration: Konfiguration;
   forbogstav: string;
   logUd: () => void;
@@ -76,8 +78,14 @@ export function BrugerMenu({
         onClick={() => setAaben((v) => !v)}
         className="flex w-full items-center gap-2 rounded px-1 py-1 transition-colors hover:bg-flade-haevet"
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-flade-haevet text-xs font-medium text-tekst ring-1 ring-transparent transition-all duration-200">
-          {forbogstav}
+        <span className="h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-transparent transition-all duration-200">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center bg-flade-haevet text-xs font-medium text-tekst">
+              {forbogstav}
+            </span>
+          )}
         </span>
         <span className="min-w-0 flex-1 text-left">
           <span className="block truncate text-xs font-medium text-tekst">{visningsnavn}</span>
@@ -98,6 +106,7 @@ export function BrugerMenu({
           email={email}
           rolle={rolle}
           navn={navn}
+          avatarUrl={avatarUrl}
           konfiguration={konfiguration}
           onLuk={() => setIndstillingerAaben(false)}
         />
