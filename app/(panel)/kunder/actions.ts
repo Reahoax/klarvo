@@ -119,6 +119,38 @@ export async function opdaterMoederKoebt(formData: FormData) {
   revalidatePath("/kunder");
 }
 
+// Etape 6 — Opkaldsmanuskripter (Spec.md 2B): "Gemte manuskripter pr. kunde
+// og segment... Versionering, så vi kan se hvilket manuskript der gav hvilke
+// resultater." Hver gemning er en NY række (aldrig en UPDATE), så tidligere
+// versioner bevares uændret til senere at kunne sammenlignes med resultater.
+export async function opretManuskript(formData: FormData) {
+  const kundeId = String(formData.get("kundeId") ?? "");
+  const indhold = String(formData.get("indhold") ?? "").trim();
+  if (!kundeId || !indhold) return;
+
+  const supabase = await opretServerKlient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: seneste } = await supabase
+    .from("manuskripter")
+    .select("version")
+    .eq("kunde_id", kundeId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase.from("manuskripter").insert({
+    kunde_id: kundeId,
+    indhold,
+    version: (seneste?.version ?? 0) + 1,
+    bruger_id: user?.id ?? null,
+  });
+
+  revalidatePath(`/kunder/${kundeId}`);
+}
+
 export async function skiftAktivStatus(formData: FormData) {
   const kundeId = String(formData.get("kundeId") ?? "");
   const nyStatus = formData.get("aktive") === "true";

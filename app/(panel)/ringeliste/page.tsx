@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { opretServerKlient } from "@/lib/supabase/server";
+import { erIndenforRingetid } from "@/lib/leads/ringetid.ts";
+import { INDVENDINGER } from "@/lib/leads/indvendinger.ts";
 import { gemAktivitet } from "./actions";
 
 type Kandidat = {
@@ -46,13 +48,79 @@ const UDFALD_KNAPPER: { udfald: string; label: string; klasse: string }[] = [
 export default async function RingelisteSide() {
   const supabase = await opretServerKlient();
 
-  const { data: kandidater, error } = await supabase
-    .from("ringeliste_kandidater")
-    .select(
-      "id, virksomhedsnavn, cvr_nummer, kontaktperson_navn, kontaktperson_titel, telefon, branchetekst, by, kunde_id, antal_forsoeg"
-    )
-    .order("oprettet", { ascending: true })
-    .returns<Kandidat[]>();
+  const { data: konfiguration } = await supabase
+    .from("konfiguration")
+    .select("ringetid_fra, ringetid_til, ringetid_ugedage")
+    .eq("id", true)
+    .single();
+
+  const indenforRingetid = konfiguration ? erIndenforRingetid(konfiguration) : true;
+
+  const { data: kandidater, error } = indenforRingetid
+    ? await supabase
+        .from("ringeliste_kandidater")
+        .select(
+          "id, virksomhedsnavn, cvr_nummer, kontaktperson_navn, kontaktperson_titel, telefon, branchetekst, by, kunde_id, antal_forsoeg"
+        )
+        .order("oprettet", { ascending: true })
+        .returns<Kandidat[]>()
+    : { data: null, error: null };
+
+  const kundeIds = [...new Set((kandidater ?? []).map((k) => k.kunde_id).filter(Boolean))];
+  const { data: manuskripter } = kundeIds.length
+    ? await supabase
+        .from("manuskripter")
+        .select("id, kunde_id, version, indhold")
+        .in("kunde_id", kundeIds)
+        .order("version", { ascending: false })
+    : { data: [] as { id: string; kunde_id: string; version: number; indhold: string }[] };
+  // Kun den nyeste version pr. kunde er relevant her - order+ovenstående sikrer
+  // at den første vi støder på pr. kunde_id i loopet er den nyeste.
+  const nyesteManuskriptPrKunde = new Map<string, { id: string; version: number; indhold: string }>();
+  for (const m of manuskripter ?? []) {
+    if (!nyesteManuskriptPrKunde.has(m.kunde_id)) {
+      nyesteManuskriptPrKunde.set(m.kunde_id, { id: m.id, version: m.version, indhold: m.indhold });
+    }
+  }
+
+  if (!indenforRingetid && konfiguration) {
+    const UGEDAG_LABEL: Record<number, string> = {
+      1: "man",
+      2: "tir",
+      3: "ons",
+      4: "tor",
+      5: "fre",
+      6: "lør",
+      7: "søn",
+    };
+    const dage = konfiguration.ringetid_ugedage
+      .slice()
+      .sort((a: number, b: number) => a - b)
+      .map((d: number) => UGEDAG_LABEL[d])
+      .join(", ");
+    return (
+      <div>
+        <div className="border-b border-kant px-6 py-3 text-xs text-tekst-daempet">
+          <span className="text-accent">Pipeline</span>
+          <span className="mx-1.5">/</span>
+          <span>Ringeliste</span>
+        </div>
+        <div className="mx-auto max-w-2xl px-6 py-6">
+          <h1 className="text-xl font-semibold text-tekst">Ringeliste</h1>
+          <div className="mt-6 rounded-lg border border-advarsel/40 bg-advarsel-baggrund px-6 py-10 text-center">
+            <p className="text-sm text-advarsel">
+              Uden for ringetid — ringelisten er skjult.
+            </p>
+            <p className="mt-1 text-sm text-tekst-daempet">
+              Åben {dage} kl. {konfiguration.ringetid_fra.slice(0, 5)}–
+              {konfiguration.ringetid_til.slice(0, 5)}. Ændres i Indstillinger →
+              Forretningsregler.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -92,6 +160,7 @@ export default async function RingelisteSide() {
                 [k.branchetekst, k.by].filter(Boolean).join(" · ") ||
                 "Ingen yderligere kontekst";
               const kanBookeMoede = k.kunde_id !== null;
+              const manuskript = k.kunde_id ? nyesteManuskriptPrKunde.get(k.kunde_id) : undefined;
 
               return (
                 <form
@@ -101,6 +170,7 @@ export default async function RingelisteSide() {
                 >
                   <input type="hidden" name="leadId" value={k.id} />
                   <input type="hidden" name="kundeId" value={k.kunde_id ?? ""} />
+                  <input type="hidden" name="manuskriptId" value={manuskript?.id ?? ""} />
 
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
                     <div>
@@ -126,6 +196,17 @@ export default async function RingelisteSide() {
                     )}
                   </div>
 
+                  {manuskript && (
+                    <div className="mb-3 rounded-md border border-kant bg-baggrund px-3 py-2">
+                      <p className="mb-1 text-[11px] uppercase tracking-wide text-tekst-daempet">
+                        Manuskript v{manuskript.version}
+                      </p>
+                      <p className="whitespace-pre-wrap text-sm text-tekst-daempet">
+                        {manuskript.indhold}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <input
                       type="text"
@@ -139,6 +220,19 @@ export default async function RingelisteSide() {
                       title="Ring igen-dato (bruges kun ved udfaldet 'Ring igen'; ellers +2 dage som standard)"
                       className="rounded border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none focus-visible:border-accent"
                     />
+                    <select
+                      name="indvending"
+                      title="Indvending (bruges kun ved 'Lagde på'/'Ikke interesseret')"
+                      defaultValue=""
+                      className="rounded border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none focus-visible:border-accent"
+                    >
+                      <option value="">Indvending (valgfrit)</option>
+                      {INDVENDINGER.map((i) => (
+                        <option key={i} value={i}>
+                          {i}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="flex flex-wrap gap-2">

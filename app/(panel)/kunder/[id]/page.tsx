@@ -6,6 +6,7 @@ import {
   opdaterIcp,
   opdaterKunde,
   opdaterMoederKoebt,
+  opretManuskript,
   skiftAktivStatus,
 } from "../actions";
 
@@ -44,6 +45,13 @@ type TilknyttetLead = {
   status_pipeline: string;
 };
 
+type Manuskript = {
+  id: string;
+  version: number;
+  indhold: string;
+  oprettet: string;
+};
+
 export default async function KundeDetaljeSide({
   params,
 }: {
@@ -60,14 +68,22 @@ export default async function KundeDetaljeSide({
 
   if (error || !kunde) notFound();
 
-  const [{ data: saldo }, { data: leads }] = await Promise.all([
+  const [{ data: saldo }, { data: leads }, { data: manuskripter }] = await Promise.all([
     supabase.from("kunde_saldo").select("*").eq("kunde_id", id).maybeSingle<Saldo>(),
     supabase
       .from("leads")
       .select("id, virksomhedsnavn, cvr_nummer, status_pipeline")
       .eq("kunde_id", id)
       .returns<TilknyttetLead[]>(),
+    supabase
+      .from("manuskripter")
+      .select("id, version, indhold, oprettet")
+      .eq("kunde_id", id)
+      .order("version", { ascending: false })
+      .returns<Manuskript[]>(),
   ]);
+
+  const [nyesteManuskript, ...tidligereManuskripter] = manuskripter ?? [];
 
   const icp = kunde.icp ?? {};
   const pilotUdloebet = kunde.pilot_slutdato
@@ -343,6 +359,64 @@ export default async function KundeDetaljeSide({
                 Gem kundeprofil
               </button>
             </form>
+          </section>
+
+          <section>
+            <h2 className="mb-1 text-sm font-semibold text-tekst">Opkaldsmanuskript</h2>
+            <p className="mb-2 text-xs text-tekst-daempet">
+              Vist i ringelisten for leads tilknyttet denne kunde. Hver gemning laver en ny
+              version — tidligere versioner slettes ikke, så resultater kan spores til den
+              version, der var i brug.
+            </p>
+            <div className="flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4">
+              {nyesteManuskript ? (
+                <div className="rounded-md border border-kant bg-baggrund px-3 py-2">
+                  <p className="mb-1 text-[11px] uppercase tracking-wide text-tekst-daempet">
+                    Nuværende — version {nyesteManuskript.version}
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm text-tekst">
+                    {nyesteManuskript.indhold}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-tekst-daempet">Intet manuskript endnu.</p>
+              )}
+
+              <form action={opretManuskript} className="flex flex-col gap-2">
+                <input type="hidden" name="kundeId" value={kunde.id} />
+                <textarea
+                  name="indhold"
+                  rows={4}
+                  placeholder="Skriv en ny version af manuskriptet…"
+                  className="rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none transition-colors focus-visible:border-accent"
+                />
+                <button
+                  type="submit"
+                  className="w-fit rounded-md border border-kant px-3 py-1.5 text-sm text-tekst-daempet transition-colors hover:border-accent hover:text-tekst"
+                >
+                  Gem som version {(nyesteManuskript?.version ?? 0) + 1}
+                </button>
+              </form>
+
+              {tidligereManuskripter.length > 0 && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-tekst-daempet hover:text-tekst">
+                    {tidligereManuskripter.length} tidligere version
+                    {tidligereManuskripter.length === 1 ? "" : "er"}
+                  </summary>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {tidligereManuskripter.map((m) => (
+                      <li key={m.id} className="rounded-md border border-kant px-3 py-2">
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-tekst-daempet">
+                          Version {m.version} — {new Date(m.oprettet).toLocaleDateString("da-DK")}
+                        </p>
+                        <p className="whitespace-pre-wrap text-tekst-daempet">{m.indhold}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
           </section>
 
           <section>

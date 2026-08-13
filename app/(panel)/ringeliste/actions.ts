@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
+import { INDVENDINGER, UDFALD_MED_INDVENDING } from "@/lib/leads/indvendinger.ts";
 
 const GYLDIGE_UDFALD = [
   "ikke_kontakt",
@@ -22,13 +23,24 @@ const MAKS_FORSOEG = 4;
 export async function gemAktivitet(formData: FormData) {
   const leadId = String(formData.get("leadId") ?? "");
   const kundeId = formData.get("kundeId") ? String(formData.get("kundeId")) : null;
+  const manuskriptId = formData.get("manuskriptId") ? String(formData.get("manuskriptId")) : null;
   const udfald = String(formData.get("udfald") ?? "");
   const note = String(formData.get("note") ?? "").trim();
   const ringIgenRaa = String(formData.get("ring_igen_dato") ?? "").trim();
+  const indvendingRaa = String(formData.get("indvending") ?? "").trim();
 
   if (!leadId || !GYLDIGE_UDFALD.includes(udfald as (typeof GYLDIGE_UDFALD)[number])) {
     return;
   }
+
+  // Indvending gemmes kun ved udfald, hvor den reelt giver mening (afviste
+  // opkald) - se lib/leads/indvendinger.ts. Ignoreres stille ellers, i
+  // stedet for at kræve klient-JS til at skjule feltet betinget.
+  const indvending =
+    UDFALD_MED_INDVENDING.has(udfald) &&
+    (INDVENDINGER as readonly string[]).includes(indvendingRaa)
+      ? indvendingRaa
+      : null;
 
   const supabase = await opretServerKlient();
   const {
@@ -52,6 +64,8 @@ export async function gemAktivitet(formData: FormData) {
     udfald,
     note: note || null,
     ring_igen_dato: ringIgenDato,
+    indvending,
+    manuskript_id: manuskriptId || null,
     bruger_id: user?.id ?? null,
   });
 

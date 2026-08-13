@@ -136,7 +136,7 @@ export function TemaVaelger() {
               : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
           }
         >
-          <div className="mb-2 h-12 rounded bg-[#0b0b0c]">
+          <div className="mb-2 h-12 rounded border border-[#2a2a2d] bg-[#0b0b0c]">
             <div className="h-3 w-2/3 rounded-t bg-[#161617]" />
           </div>
           <p className="text-sm font-medium text-tekst">Mørk</p>
@@ -168,7 +168,7 @@ export function TemaVaelger() {
               : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
           }
         >
-          <div className="mb-2 h-12 overflow-hidden rounded">
+          <div className="mb-2 h-12 overflow-hidden rounded border border-kant">
             <div className="grid h-full grid-cols-4">
               <div className="bg-[#e0603c]" />
               <div className="bg-[#4caf7d]" />

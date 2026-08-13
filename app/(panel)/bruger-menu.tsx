@@ -1,22 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { IndstillingerModal } from "./indstillinger-modal";
+
+type Konfiguration = {
+  tilladte_virksomhedsformer: string[];
+  virksomhedsformer_fysiske_personer: string[];
+  import_advarsel_graense: number;
+  ringetid_fra: string;
+  ringetid_til: string;
+  ringetid_ugedage: number[];
+} | null;
 
 export function BrugerMenu({
   email,
   rolle,
   navn,
+  konfiguration,
   forbogstav,
   logUd,
 }: {
   email: string | undefined;
   rolle: string;
   navn: string | null;
+  konfiguration: Konfiguration;
   forbogstav: string;
   logUd: () => void;
 }) {
   const [aaben, setAaben] = useState(false);
+  const [indstillingerAaben, setIndstillingerAaben] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,13 +50,16 @@ export function BrugerMenu({
           <p className="truncate border-b border-kant px-3 py-2.5 text-xs text-tekst-daempet">
             {email}
           </p>
-          <Link
-            href="/indstillinger"
-            onClick={() => setAaben(false)}
+          <button
+            type="button"
+            onClick={() => {
+              setAaben(false);
+              setIndstillingerAaben(true);
+            }}
             className="block w-full px-3 py-2 text-left text-sm text-tekst transition-colors hover:bg-flade-haevet"
           >
             Indstillinger
-          </Link>
+          </button>
           <form action={logUd}>
             <button
               type="submit"
@@ -77,6 +92,16 @@ export function BrugerMenu({
           ⌄
         </span>
       </button>
+
+      {indstillingerAaben && (
+        <IndstillingerModal
+          email={email}
+          rolle={rolle}
+          navn={navn}
+          konfiguration={konfiguration}
+          onLuk={() => setIndstillingerAaben(false)}
+        />
+      )}
     </div>
   );
 }

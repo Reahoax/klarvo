@@ -1,30 +1,57 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { opdaterNavn, skiftAdgangskode, gemForretningsregler } from "../indstillinger-actions";
-import { TemaVaelger } from "../tema-vaelger";
+import { useActionState, useEffect, useState } from "react";
+import { opdaterNavn, skiftAdgangskode, gemForretningsregler } from "./indstillinger-actions";
+import { TemaVaelger } from "./tema-vaelger";
 
 type Konfiguration = {
   tilladte_virksomhedsformer: string[];
   virksomhedsformer_fysiske_personer: string[];
   import_advarsel_graense: number;
+  ringetid_fra: string;
+  ringetid_til: string;
+  ringetid_ugedage: number[];
 } | null;
+
+const UGEDAGE = [
+  { tal: 1, label: "Man" },
+  { tal: 2, label: "Tir" },
+  { tal: 3, label: "Ons" },
+  { tal: 4, label: "Tor" },
+  { tal: 5, label: "Fre" },
+  { tal: 6, label: "Lør" },
+  { tal: 7, label: "Søn" },
+] as const;
 
 type Sektion = "konto" | "udseende" | "forretningsregler";
 
-export function IndstillingerSide({
+// Pop-op igen (2026-08-13): var kortvarigt en fuld side (/indstillinger), men
+// brugeren ville have den tilbage som pop-op - "ligesom her i Claude". Selve
+// sidebar+sektions-indholdet fra siden er bevaret uændret, kun rammen er nu
+// en modal (fixed inset-0 + backdrop) i stedet for en route.
+export function IndstillingerModal({
   email,
   rolle,
   navn,
   konfiguration,
+  onLuk,
 }: {
   email: string | undefined;
   rolle: string;
   navn: string | null;
   konfiguration: Konfiguration;
+  onLuk: () => void;
 }) {
   const erEjer = rolle === "ejer";
   const [sektion, setSektion] = useState<Sektion>("konto");
+
+  useEffect(() => {
+    function paaEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") onLuk();
+    }
+    window.addEventListener("keydown", paaEscape);
+    return () => window.removeEventListener("keydown", paaEscape);
+  }, [onLuk]);
 
   const punkter: { id: Sektion; label: string }[] = [
     { id: "konto", label: "Konto" },
@@ -33,13 +60,12 @@ export function IndstillingerSide({
   ];
 
   return (
-    <div>
-      <div className="border-b border-kant px-6 py-3 text-xs text-tekst-daempet">
-        <span>Indstillinger</span>
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onLuk} aria-hidden />
 
-      <div className="flex gap-8 px-6 py-6">
-        <nav className="w-48 shrink-0">
+      <div className="relative flex max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-xl border border-kant bg-flade shadow-2xl shadow-black/50">
+        <nav className="w-48 shrink-0 overflow-y-auto border-r border-kant bg-flade-haevet/40 p-3">
+          <p className="mb-2 px-2 text-sm font-semibold text-tekst">Indstillinger</p>
           <ul className="flex flex-col gap-0.5">
             {punkter.map((p) => (
               <li key={p.id}>
@@ -59,12 +85,24 @@ export function IndstillingerSide({
           </ul>
         </nav>
 
-        <div className="max-w-xl flex-1">
-          {sektion === "konto" && <KontoSektion email={email} rolle={rolle} navn={navn} />}
-          {sektion === "udseende" && <UdseendeSektion />}
-          {sektion === "forretningsregler" && erEjer && (
-            <ForretningsreglerSektion konfiguration={konfiguration} />
-          )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-end border-b border-kant px-4 py-2.5">
+            <button
+              type="button"
+              onClick={onLuk}
+              className="rounded p-1 text-tekst-daempet transition-colors hover:bg-flade-haevet hover:text-tekst"
+              aria-label="Luk"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="min-w-0 flex-1 overflow-y-auto px-6 py-6">
+            {sektion === "konto" && <KontoSektion email={email} rolle={rolle} navn={navn} />}
+            {sektion === "udseende" && <UdseendeSektion />}
+            {sektion === "forretningsregler" && erEjer && (
+              <ForretningsreglerSektion konfiguration={konfiguration} />
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -213,6 +251,45 @@ function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfigurat
           <p className="mt-1 text-xs text-tekst-daempet">
             Advarer ved import, hvis det samlede antal leads efter importen overstiger dette tal.
           </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-tekst-daempet">
+            Ringetidsvindue
+          </label>
+          <p className="mb-2 text-xs text-tekst-daempet">
+            Ringelisten skjules automatisk uden for disse tidspunkter og ugedage.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="time"
+              name="ringetid_fra"
+              defaultValue={konfiguration?.ringetid_fra?.slice(0, 5)}
+              className="rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none focus-visible:border-accent"
+            />
+            <span className="text-sm text-tekst-daempet">til</span>
+            <input
+              type="time"
+              name="ringetid_til"
+              defaultValue={konfiguration?.ringetid_til?.slice(0, 5)}
+              className="rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none focus-visible:border-accent"
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {UGEDAGE.map((d) => (
+              <label key={d.tal} className="flex items-center gap-1.5 text-xs text-tekst">
+                <input
+                  type="checkbox"
+                  name="ringetid_ugedage"
+                  value={d.tal}
+                  defaultChecked={(konfiguration?.ringetid_ugedage ?? [1, 2, 3, 4, 5]).includes(
+                    d.tal
+                  )}
+                />
+                {d.label}
+              </label>
+            ))}
+          </div>
         </div>
 
         <button

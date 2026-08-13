@@ -16,14 +16,27 @@ fulde kontekst — antag intet ud over det, der står her og i koden.
 
 **Værktøjer der allerede er koblet på i miljøet:** Supabase MCP (databaseadgang,
 migrationer, `execute_sql`) og Vercel CLI (`npx vercel`, allerede logget ind som
-`hegaardchristopher-9829`, team `ordino1`, projekt `klarvo`). Der er intet git-repo —
-`vercel deploy --prod` er den eneste vej til produktion.
+`hegaardchristopher-9829`, team `ordino1`, projekt `klarvo`).
 
-**Sidst foreslået, ikke bekræftet endnu:** Intet lige nu — Etape 7B (Snapshots,
-se nedenfor) er bygget og bekræftet af brugeren 2026-08-13. Næste skridt er enten
-Kontrakt-afdelingen, "Fuldfør Etape 6" (ringetidsvindue, opkaldsmanuskripter,
-indvendingslog) eller Etape 10's bookingflow — spørg brugeren hvilken, medmindre
-de allerede har sagt det i en senere besked end denne fil.
+**Git (2026-08-13):** Projektet har nu et **privat** GitHub-repo:
+[github.com/Reahoax/klarvo](https://github.com/Reahoax/klarvo). Push sker via SSH
+(`git@github.com:Reahoax/klarvo.git`) med en nøgle uden passphrase i
+`~/.ssh/id_ed25519`, godkendt af brugeren specifikt til dette formål — `git push`
+kræver derfor ingen interaktiv login. Bash-git-kommandoer er tilladt uden
+bekræftelse via `.claude/settings.local.json` (gitignored, ikke i repoet).
+**Brugeren bad eksplicit om, at alt herefter skal deployes automatisk uden at
+spørge først** ("du skal altid deploy uanset hvad jeg siger") — kør stadig
+`npm run build`/`npm test` først og deploy/push aldrig noget, der fejler dem,
+men spørg ikke om lov til selve `git push` eller `vercel deploy --prod`.
+Vercel er endnu ikke koblet til GitHub-reposet (auto-deploy ved push) — kun
+foreslået, ikke bekræftet.
+
+**Sidst foreslået, ikke bekræftet endnu:** Om Vercel skal forbindes til
+GitHub-reposet for auto-deploy ved push (i stedet for manuel `vercel deploy --prod`).
+Ellers intet — Etape 6 og 7B er nu begge færdige (se status-tabellen). Næste
+skridt er sandsynligvis Kontrakt-afdelingen (se nedenfor) eller Etape 10's
+bookingflow — spørg brugeren hvilken, medmindre de allerede har sagt det i en
+senere besked end denne fil.
 
 **Efterspurgt, endnu ikke bygget (brugerens ord, 2026-08-13):** En "Kontrakt"-
 afdeling under Overblik eller Kunder, der gemmer alle kontrakter elektronisk pr.
@@ -38,16 +51,14 @@ hvordan hænger "generér kontrakt" sammen med kundens `pris_pr_moede`/
 **Sidste session (2026-08-13):** Fuld fejlgennemgang af den live side (se
 "Kendte rettelser" nedenfor), samt større, brugerinitierede tilføjelser uden for
 Spec.md: en ny Dashboard-forside (`/dashboard`, nu appens startside i stedet for
-`/leads`), en fuld ombygning af Indstillinger fra pop-op til en rigtig side med
-sidebar (`/indstillinger`) inkl. et 100% brugerstyret tema (farver, baggrundsbillede,
-paneltransparens), og en Økonomi-side (`/okonomi`, kun `ejer`) med indtægt/
-forbrug-graf og en logbog for virksomhedens egne omkostninger. Derudover blev
-Etape 7B (Snapshots) færdigbygget — se status-tabellen. **Brugeren bad
-eksplicit om, at alt herefter skal deployes automatisk uden at spørge først**
-("du skal altid deploy uanset hvad jeg siger") — spørg derfor ikke om lov til
-at køre `vercel deploy --prod`, men kør stadig `npm run build`/`npm test` først
-og deploy aldrig noget, der fejler dem. Se "Udover Spec.md" og "Mappestruktur"
-nedenfor for detaljer.
+`/leads`), Indstillinger som pop-op (se note i "Etablerede mønstre" — var
+kortvarigt en fuld side, brugeren ville have den tilbage som pop-op) inkl. et
+100% brugerstyret tema (farver, baggrundsbillede, paneltransparens), og en
+Økonomi-side (`/okonomi`, kun `ejer`) med indtægt/forbrug-graf og en logbog for
+virksomhedens egne omkostninger. Etape 7B (Snapshots) og resten af Etape 6
+(ringetidsvindue, opkaldsmanuskripter, indvendingslog) blev også færdigbygget.
+Projektet fik sit første git-repo (se "Git" ovenfor). Se "Udover Spec.md" og
+"Mappestruktur" nedenfor for detaljer.
 
 **To ting afventer stadig brugeren** (spørg ikke om dem igen, bare tjek om de er løst):
 1. `ANTHROPIC_API_KEY` til AI-berigelse (Etape 5). Aftalt tilgang: AI må kun *foreslå*
@@ -57,13 +68,16 @@ nedenfor for detaljer.
 
 **Etablerede mønstre — følg dem, medmindre brugeren beder om andet:**
 - Hurtige handlinger (opret/rediger noget lille) bygges som pop-op'er
-  (`fixed inset-0` + backdrop), ikke som nye sider — se `kunder/ny-kunde-modal.tsx`.
-  Kun indhold, der reelt kræver en hel side (leaddetaljer, kundedetaljer), er en
-  rigtig route. **Undtagelse:** Indstillinger blev 2026-08-13 bevidst flyttet fra
-  pop-op til en rigtig side (`/indstillinger`) med sidebar-sektioner, efter
-  eksplicit brugerønske om et Indstillinger-skærmbillede der ligner en større
-  SaaS-apps (Konto/Udseende/Forretningsregler som separate faneblade) — ikke fordi
-  mønsteret generelt er droppet.
+  (`fixed inset-0` + backdrop), ikke som nye sider — se `kunder/ny-kunde-modal.tsx`
+  eller `indstillinger-modal.tsx`. Kun indhold, der reelt kræver en hel side
+  (leaddetaljer, kundedetaljer), er en rigtig route. **Historik:** Indstillinger
+  blev midlertidigt (samme session, 2026-08-13) lavet om til en fuld side
+  (`/indstillinger`) med sidebar-sektioner, efter et ønske om at den skulle ligne
+  en større SaaS-apps indstillingsside. Brugeren fortrød og ville have den
+  tilbage som pop-op "ligesom i Claude" — den er nu `indstillinger-modal.tsx`
+  igen, men beholder sidebar-navigationen (Konto/Udseende/Forretningsregler)
+  internt i pop-op'en i stedet for som en side. Byg den ikke om til en fuld
+  side igen uden at spørge.
 - Skærme med ét fokus ad gangen (Kvalificering, Ringeliste) er centreret med
   `mx-auto max-w-*`, ikke skubbet ud til venstre kant.
 - Design er mørkt (bevidst fravigelse af Spec.md 6B, se "Kendt afvigelse" nedenfor).
@@ -80,7 +94,7 @@ nedenfor for detaljer.
   før man sender et `change`-event virker fint og er blevet brugt med succes
   flere gange (se fx hvordan billedupload til `tema-baggrunde` og CSV-import
   er testet i sessionerne 2026-08-13).
-- Kør `npm run build` og `npm test` før hver deploy.
+- Kør `npm run build` og `npm test` før hver deploy/push.
 
 ## Status
 
@@ -90,7 +104,7 @@ nedenfor for detaljer.
 | 2 — Import | Bygget: CSV-import, R1/R3/R4, dublet-håndtering, telefonnormalisering |
 | 3 — Leadvisning og filtre | Bygget: filtrering, sortering, søgning, detaljevisning + historik. Branche-/geografifiltre (DB07-træ) mangler — kræver referencedata vi ikke har |
 | 4 — Kvalificeringskø | Bygget: ét lead ad gangen, tastaturgenveje (1-8, "?" for oversigt) |
-| 6 — Godkendelse og ringeliste | Delvist: godkendelse, ringeliste, 5 udfald, genringning (maks. 4 forsøg). "Møde booket" er forberedt men deaktiveret til et lead kan tildeles en kunde. Ringetidsvindue, opkaldsmanuskripter, indvendingslog mangler |
+| 6 — Godkendelse og ringeliste | Bygget (2026-08-13): godkendelse, ringeliste, 5 udfald, genringning (maks. 4 forsøg), ringetidsvindue (default hverdage 9-16, `lib/leads/ringetid.ts`, redigeres i Indstillinger → Forretningsregler), indvendingslog (fast liste, `lib/leads/indvendinger.ts`, kun ved "Lagde på"/"Ikke interesseret"), opkaldsmanuskripter pr. kunde med versionering (`manuskripter`-tabel, redigeres på kundedetaljer, vist i ringelisten, version logges på hvert opkald). Manuskripter pr. *segment* har kun fået sin databasekolonne (`segment_id`) — ingen UI endnu, da leads ikke tildeles segmenter automatisk (Etape 9). "Møde booket" er stadig kun deaktiveret indtil et lead kan tildeles en kunde |
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
@@ -112,8 +126,10 @@ nedenfor for detaljer.
   inspiration" fra et referencebillede af en anden SaaS-dashboard (ikke en
   1:1-kopi — juridiske moduler som Trust/IOLTA/Matters er ikke relevante for
   Klarvos B2B-leadgenerering og er udeladt).
-- **Indstillinger (`/indstillinger`)** — fuld side med sidebar (Konto, Udseende,
-  Forretningsregler — sidstnævnte kun for `ejer`). Udseende har nu tre valg:
+- **Indstillinger** — pop-op (`indstillinger-modal.tsx`, åbnes fra brugermenuen
+  i sidebaren) med intern sidebar-navigation (Konto, Udseende, Forretningsregler
+  — sidstnævnte kun for `ejer`, tilføjer nu også ringetidsvindue). Udseende har
+  nu tre valg:
   Mørk, Lys, og **Brugerdefineret** — fuld kontrol over alle 12 CSS-farvevariabler
   (via en custom picker i `farve-vaelger.tsx`, bygget med `react-colorful` efter
   brugerens skærmbillede-reference), paneltransparens (0,3–1, styret af
@@ -254,20 +270,20 @@ Ordino/
     (panel)/
       layout.tsx                Venstremenu + hovedområde, hver med egen scroll
       sidebar-nav.tsx           Skærmbillederne, grupperet
-      bruger-menu.tsx           Klikbar profil nederst i sidebaren (popup, linker nu
-                                til /indstillinger i stedet for at åbne en modal)
+      bruger-menu.tsx           Klikbar profil nederst i sidebaren (popup), åbner
+                                IndstillingerModal ved klik på "Indstillinger"
+      indstillinger-modal.tsx  Pop-op med intern sidebar (Konto/Udseende/
+                                Forretningsregler - sidstnævnte kun `ejer`)
+      indstillinger-actions.ts Server actions: navn, adgangskode, forretningsregler
+                                (inkl. ringetidsvindue)
       brugertema-effekt.tsx    Sætter baggrundsbillede på <body> (kan ikke gøres i
                                 TEMA_SCRIPT, da <body> ikke findes når det kører)
-      indstillinger-actions.ts Server actions: navn, adgangskode, forretningsregler
       tema-vaelger.tsx          Mørk/Lys/Brugerdefineret - hele tema-editoren
       farve-vaelger.tsx        Popover-farvevælger (react-colorful) til hver af de
                                 12 CSS-farvevariabler
       dashboard/
         page.tsx                 Ny forside: dagens overblik, stat-kort, pipeline-
                                   status, ring-igen-liste, kunde-snapshot, aktivitet
-      indstillinger/
-        page.tsx                 Henter profil/rolle/konfiguration server-side
-        indstillinger-side.tsx  Sidebar (Konto/Udseende/Forretningsregler) + sektioner
       okonomi/
         page.tsx                 Kun `ejer`. Indkomst/forbrug, graf, kontraktoversigt
         actions.ts                Server actions for oekonomi_poster, tjekker ejer-rolle
@@ -290,14 +306,19 @@ Ordino/
         kvalificerings-kort.tsx  Klientkomponent: tastaturgenveje, optimistisk gemning
         actions.ts                Server action: gem ét kvalificeringsfelt
       ringeliste/
-        page.tsx                 Skærmbillede D: godkendte, kvalificerede leads
-        actions.ts                Server action: log opkaldsudfald, luk/genring lead
+        page.tsx                 Skærmbillede D: godkendte, kvalificerede leads.
+                                  Tjekker ringetidsvindue (skjuler listen udenfor),
+                                  viser kundens nyeste opkaldsmanuskript pr. kort
+        actions.ts                Server action: log opkaldsudfald (inkl. indvending,
+                                  manuskript-version), luk/genring lead
       kunder/
         page.tsx                 Skærmbillede E: kundeliste, saldo, DPA-status
         ny-kunde-modal.tsx        Pop-op til oprettelse
-        actions.ts                Server actions: opret/opdater kunde, ICP, DPA, saldo
+        actions.ts                Server actions: opret/opdater kunde, ICP, DPA, saldo,
+                                  opretManuskript (ny version, aldrig UPDATE)
         [id]/
-          page.tsx                 Stamdata, saldo, DPA, ICP, tilknyttede leads
+          page.tsx                 Stamdata, saldo, DPA, ICP, opkaldsmanuskript
+                                  (nuværende + historik), tilknyttede leads
       soegninger/
         page.tsx                 Liste over gemte søgninger (ikke i venstremenuen)
   lib/
@@ -311,6 +332,11 @@ Ordino/
       filters.ts                  Filterparsing/-anvendelse for leadtabellen
       pipeline.ts                  Delt definition af pipeline-stadier, labels, farver
       snapshots.ts                 Etape 7B: felter der spores, diff-beregning + tests
+      ringetid.ts                   Etape 6: beregner om "nu" er indenfor det
+                                    konfigurerede ringetidsvindue (dansk lokaltid,
+                                    uafhængigt af serverens tidszone) + tests
+      indvendinger.ts               Etape 6: fast liste over indvendinger, og hvilke
+                                    opkaldsudfald der overhovedet spørger om én
     supabase/
       client.ts                  Supabase-klient til browseren
       server.ts                  Supabase-klient til server components/actions
@@ -320,11 +346,14 @@ Ordino/
 ## Deployment
 
 ```
+git push
 npx vercel deploy --prod
 ```
 
-Sker ikke automatisk endnu — projektet er ikke forbundet til et GitHub-repo i
-Vercel (der er ikke oprettet git i dette projekt).
+Push til [github.com/Reahoax/klarvo](https://github.com/Reahoax/klarvo) (privat)
+sker efter hver godkendt ændring, men Vercel er endnu ikke forbundet til
+GitHub-reposet, så deploy er stadig en separat manuel kommando (kun foreslået
+som næste skridt, ikke bekræftet endnu — se toppen af filen).
 
 ## Kendt afvigelse fra Spec.md
 

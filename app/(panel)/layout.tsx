@@ -18,6 +18,19 @@ export default async function PanelLayout({
     ? await supabase.from("profiler").select("rolle, navn").eq("id", user.id).single()
     : { data: null };
 
+  const erEjer = profil?.rolle === "ejer";
+  // Kun ejere ser/kan ændre Forretningsregler i Indstillinger-pop-op'en, så
+  // konfiguration hentes kun for dem - operatører behøver den aldrig.
+  const { data: konfiguration } = erEjer
+    ? await supabase
+        .from("konfiguration")
+        .select(
+          "tilladte_virksomhedsformer, virksomhedsformer_fysiske_personer, import_advarsel_graense, ringetid_fra, ringetid_til, ringetid_ugedage"
+        )
+        .eq("id", true)
+        .single()
+    : { data: null };
+
   const forbogstav = (profil?.navn || user?.email || "?").slice(0, 1).toUpperCase();
 
   return (
@@ -41,6 +54,7 @@ export default async function PanelLayout({
           email={user?.email}
           rolle={profil?.rolle ?? "operator"}
           navn={profil?.navn ?? null}
+          konfiguration={konfiguration}
           forbogstav={forbogstav}
           logUd={logUd}
         />

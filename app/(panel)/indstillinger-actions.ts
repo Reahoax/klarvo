@@ -83,6 +83,17 @@ export async function gemForretningsregler(
     return { fejl: "Import-advarselsgrænsen skal være et positivt tal." };
   }
 
+  const ringetidFra = String(formData.get("ringetid_fra") ?? "").trim();
+  const ringetidTil = String(formData.get("ringetid_til") ?? "").trim();
+  const ringetidUgedage = formData
+    .getAll("ringetid_ugedage")
+    .map((v) => Number.parseInt(String(v), 10))
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 7);
+
+  if (ringetidFra && ringetidTil && ringetidFra >= ringetidTil) {
+    return { fejl: "Ringetidsvinduets sluttidspunkt skal være efter starttidspunktet." };
+  }
+
   const { error } = await supabase
     .from("konfiguration")
     .update({
@@ -91,12 +102,14 @@ export async function gemForretningsregler(
         formData.get("virksomhedsformer_fysiske_personer")
       ),
       ...(graense !== null ? { import_advarsel_graense: graense } : {}),
+      ...(ringetidFra ? { ringetid_fra: ringetidFra } : {}),
+      ...(ringetidTil ? { ringetid_til: ringetidTil } : {}),
+      ringetid_ugedage: ringetidUgedage,
     })
     .eq("id", true);
 
   if (error) return { fejl: error.message };
 
-  revalidatePath("/indstillinger");
-  revalidatePath("/leads/importer");
+  revalidatePath("/", "layout");
   return { ok: true };
 }
