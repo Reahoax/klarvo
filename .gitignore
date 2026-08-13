@@ -1,0 +1,21 @@
+# Node
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Miljøvariabler - må aldrig committes
+.env
+.env.local
+.env*.local
+
+# Diverse
+.DS_Store
+*.log
+.vercel
+.env*
+!.env.example
+
+# Lokal Claude Code-sessionslås - ikke projektindhold
+.claude/scheduled_tasks.lock

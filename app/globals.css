@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Farvepaletten som CSS-variabler (R G B, mellemrumsadskilt - Tailwinds format for
+   at kunne bruge /opacity-modifiers). Forberedelse til brugerindstillinger: en
+   fremtidig side kan overskrive disse på <html> for 100% brugerstyret tema, uden at
+   bygge appen om. Nuværende værdier er den mørke dashboard-stil fra 2026-08-12. */
+:root {
+  --farve-baggrund: 11 11 12;
+  --farve-flade: 22 22 23;
+  --farve-flade-haevet: 30 30 32;
+  --farve-kant: 42 42 45;
+  --farve-tekst: 242 242 240;
+  --farve-tekst-daempet: 143 143 147;
+  --farve-accent: 224 96 60;
+  --farve-accent-tekst: 255 255 255;
+  --farve-spaerret: 224 90 78;
+  --farve-advarsel: 224 168 60;
+  --farve-advarsel-baggrund: 43 35 15;
+  --farve-godkendt: 76 175 125;
+}
+
+/* Lyst tema - første konkrete skridt mod brugerstyret udseende (Indstillinger-siden).
+   Samme accentfarve som mørkt tema for genkendelig branding, resten er den
+   oprindelige lyse "fagsystem"-palette fra Spec.md 6B, som stadig er en gyldig,
+   sober mulighed for dem der foretrækker det. */
+:root[data-tema="lys"] {
+  --farve-baggrund: 247 247 245;
+  --farve-flade: 255 255 255;
+  --farve-flade-haevet: 241 241 239;
+  --farve-kant: 227 226 222;
+  --farve-tekst: 28 28 26;
+  --farve-tekst-daempet: 107 106 101;
+  --farve-accent: 224 96 60;
+  --farve-accent-tekst: 255 255 255;
+  --farve-spaerret: 179 38 30;
+  --farve-advarsel: 138 90 0;
+  --farve-advarsel-baggrund: 251 240 217;
+  --farve-godkendt: 30 107 60;
+}
+
+body {
+  @apply bg-baggrund text-tekst antialiased;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+/* Brugerdefineret baggrundsbillede (Indstillinger → Udseende → Brugerdefineret).
+   --panel-alpha styrer hvor gennemsigtige paneler/flader er, så billedet skinner
+   igennem - kun de BARE bg-*-klasser overskrives (ikke fx bg-flade/10-badges,
+   som allerede har deres egen eksplicitte opacity og ikke skal påvirkes). */
+:root {
+  --panel-alpha: 1;
+}
+:root[data-brugerbaggrund="til"] body,
+:root[data-brugerbaggrund="til"] .bg-baggrund {
+  background-color: rgb(var(--farve-baggrund) / var(--panel-alpha));
+}
+:root[data-brugerbaggrund="til"] .bg-flade {
+  background-color: rgb(var(--farve-flade) / var(--panel-alpha));
+}
+:root[data-brugerbaggrund="til"] .bg-flade-haevet {
+  background-color: rgb(var(--farve-flade-haevet) / var(--panel-alpha));
+}
+
+/* Tal i tabeller skal flugte - jf. Spec.md afsnit 6B */
+.tal {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Synlig tastaturfokus overalt, jf. kvalitetsgulvet i afsnit 6B */
+:focus-visible {
+  outline: 2px solid rgb(var(--farve-accent));
+  outline-offset: 2px;
+}
+
+/* Let, varm glød om primære handlinger - bruges sammen med bg-accent-knapper.
+   Holdt dæmpet med vilje: data er stadig hovedpersonen, glødet må ikke skrige. */
+.glow-accent {
+  box-shadow:
+    0 0 0 1px rgb(var(--farve-accent) / 0.3),
+    0 4px 20px -4px rgb(var(--farve-accent) / 0.45);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.glow-accent:hover {
+  box-shadow:
+    0 0 0 1px rgb(var(--farve-accent) / 0.5),
+    0 6px 28px -3px rgb(var(--farve-accent) / 0.6);
+}
+.glow-accent:active {
+  transform: translateY(1px);
+}
+
+/* Blød, statisk glød til fremhævede flader (fx kvalificeringsrate-kortet), uden
+   hover-løft - kortet er ikke en knap. */
+.glow-accent-blod {
+  box-shadow: 0 4px 24px -6px rgb(var(--farve-accent) / 0.5);
+}
+
+/* Ensretter udseendet af checkbokse og radioknapper med resten af paletten
+   (native accent-color, ingen håndrullet erstatningskomponent nødvendig),
+   og gør dem lidt større så de er lettere at ramme/se i filterpanelet. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: rgb(var(--farve-accent));
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* Skjuler de grimme, svært synlige spinner-pile på talfelter i mørkt tema -
+   op/ned styres fint med tastatur/scroll alligevel. */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Datovælger-ikonet er som standard mørkt og forsvinder på en mørk baggrund. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  filter: invert(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
