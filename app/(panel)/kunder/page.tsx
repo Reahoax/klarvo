@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Handshake } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { NyKundeKnap } from "./ny-kunde-modal";
 
@@ -41,7 +42,10 @@ export default async function KunderSide() {
       <div className="px-6 py-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-tekst">Kunder</h1>
+            <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+              <Handshake className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+              Kunder
+            </h1>
             <p className="mt-1 text-sm text-tekst-daempet">
               Jeres egne kunder, kundeprofil (ICP), aftalt pris pr. møde og saldo på
               forudbetalte møder.

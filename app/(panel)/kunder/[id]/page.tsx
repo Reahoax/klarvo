@@ -1,5 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  Handshake,
+  IdCard,
+  Wallet,
+  FileSignature,
+  Target,
+  MessageSquareText,
+  Building2,
+} from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import {
   opdaterDpa,
@@ -103,7 +112,10 @@ export default async function KundeDetaljeSide({
       <div className="mx-auto max-w-3xl px-6 py-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-tekst">{kunde.navn}</h1>
+            <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+              <Handshake className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+              {kunde.navn}
+            </h1>
             <p className="mt-1 text-sm text-tekst-daempet">
               {kunde.aktive ? "Aktiv kunde" : "Inaktiv"}
             </p>
@@ -129,10 +141,13 @@ export default async function KundeDetaljeSide({
 
         <div className="flex flex-col gap-6">
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-tekst">Stamdata</h2>
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <IdCard className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Stamdata
+            </h2>
             <form
               action={opdaterKunde}
-              className="grid grid-cols-1 gap-3 rounded-lg border border-kant bg-flade p-4 sm:grid-cols-2"
+              className="kort-hover grid grid-cols-1 gap-3 rounded-lg border border-kant bg-flade p-4 sm:grid-cols-2"
             >
               <input type="hidden" name="kundeId" value={kunde.id} />
               <label className="flex flex-col gap-1 text-sm">
@@ -197,10 +212,11 @@ export default async function KundeDetaljeSide({
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-tekst">
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Wallet className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
               Saldo — forudbetalte møder
             </h2>
-            <div className="grid grid-cols-3 gap-3 rounded-lg border border-kant bg-flade p-4">
+            <div className="kort-hover grid grid-cols-3 gap-3 rounded-lg border border-kant bg-flade p-4">
               <form action={opdaterMoederKoebt} className="col-span-3 flex items-end gap-2 sm:col-span-1">
                 <input type="hidden" name="kundeId" value={kunde.id} />
                 <label className="flex flex-1 flex-col gap-1 text-sm">
@@ -245,12 +261,13 @@ export default async function KundeDetaljeSide({
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-tekst">
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <FileSignature className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
               Databehandleraftale (DPA)
             </h2>
             <form
               action={opdaterDpa}
-              className="flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4"
+              className="kort-hover flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4"
             >
               <input type="hidden" name="kundeId" value={kunde.id} />
               <label className="flex items-center gap-2 text-sm text-tekst">
@@ -292,12 +309,13 @@ export default async function KundeDetaljeSide({
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-tekst">
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Target className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
               Kundeprofil (ICP) <span className="font-normal text-tekst-daempet">— hårde kriterier til matching</span>
             </h2>
             <form
               action={opdaterIcp}
-              className="flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4"
+              className="kort-hover flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4"
             >
               <input type="hidden" name="kundeId" value={kunde.id} />
               <label className="flex flex-col gap-1 text-sm">
@@ -362,13 +380,16 @@ export default async function KundeDetaljeSide({
           </section>
 
           <section>
-            <h2 className="mb-1 text-sm font-semibold text-tekst">Opkaldsmanuskript</h2>
+            <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <MessageSquareText className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Opkaldsmanuskript
+            </h2>
             <p className="mb-2 text-xs text-tekst-daempet">
               Vist i ringelisten for leads tilknyttet denne kunde. Hver gemning laver en ny
               version — tidligere versioner slettes ikke, så resultater kan spores til den
               version, der var i brug.
             </p>
-            <div className="flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4">
+            <div className="kort-hover flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4">
               {nyesteManuskript ? (
                 <div className="rounded-md border border-kant bg-baggrund px-3 py-2">
                   <p className="mb-1 text-[11px] uppercase tracking-wide text-tekst-daempet">
@@ -420,7 +441,10 @@ export default async function KundeDetaljeSide({
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-tekst">Tilknyttede leads</h2>
+            <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Building2 className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Tilknyttede leads
+            </h2>
             {(!leads || leads.length === 0) && (
               <p className="text-sm text-tekst-daempet">
                 Ingen leads tildelt endnu — matching (Etape 9) er ikke bygget.
@@ -432,7 +456,7 @@ export default async function KundeDetaljeSide({
                   <Link
                     key={l.id}
                     href={`/leads/${l.id}`}
-                    className="rounded-lg border border-kant bg-flade px-4 py-2.5 text-sm text-tekst transition-colors hover:border-accent"
+                    className="kort-hover rounded-lg border border-kant bg-flade px-4 py-2.5 text-sm text-tekst"
                   >
                     {l.virksomhedsnavn}{" "}
                     <span className="tal text-tekst-daempet">({l.cvr_nummer})</span>

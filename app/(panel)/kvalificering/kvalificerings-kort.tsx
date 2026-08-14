@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Globe, Sparkles } from "lucide-react";
 import { gemKvalificeringsFelt, type KvalificeringsFelt } from "./actions";
 
 type Lead = {
@@ -108,7 +109,7 @@ export function KvalificeringsKort({ lead }: { lead: Lead }) {
         </div>
       )}
 
-      <div className="rounded-lg border border-kant bg-flade p-6">
+      <div className="kort-hover rounded-lg border border-kant bg-flade p-6">
         <h2 className="text-lg font-semibold text-tekst">{lead.virksomhedsnavn}</h2>
         <p className="mt-1 text-sm text-tekst-daempet">
           CVR {lead.cvr_nummer}
@@ -121,8 +122,9 @@ export function KvalificeringsKort({ lead }: { lead: Lead }) {
             }
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 inline-block text-sm text-accent hover:underline"
+            className="mt-1 inline-flex items-center gap-1 text-sm text-accent hover:underline"
           >
+            <Globe className="h-3.5 w-3.5" strokeWidth={1.75} />
             Besøg hjemmeside ↗
           </a>
         ) : (
@@ -130,7 +132,8 @@ export function KvalificeringsKort({ lead }: { lead: Lead }) {
         )}
 
         <div className="mt-4 rounded border border-kant bg-baggrund p-3">
-          <p className="mb-1 text-[11px] uppercase tracking-wide text-tekst-daempet">
+          <p className="mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-tekst-daempet">
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} />
             AI-resumé <span className="normal-case">— ikke verificeret</span>
           </p>
           <p className="text-sm text-tekst-daempet">

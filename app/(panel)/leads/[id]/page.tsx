@@ -1,5 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  Building2,
+  IdCard,
+  UserRound,
+  ClipboardCheck,
+  Sparkles,
+  History,
+  Camera,
+  Calculator,
+} from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 import { beregnSnapshotDiff, SNAPSHOT_FELT_LABEL, type SnapshotData } from "@/lib/leads/snapshots.ts";
@@ -146,10 +156,11 @@ export default async function LeadDetaljeSide({
             <h1
               className={
                 lead.maa_kontaktes
-                  ? "text-xl font-semibold text-tekst"
-                  : "text-xl font-semibold text-tekst-daempet line-through"
+                  ? "flex items-center gap-2 text-xl font-semibold text-tekst"
+                  : "flex items-center gap-2 text-xl font-semibold text-tekst-daempet line-through"
               }
             >
+              <Building2 className="h-5 w-5 shrink-0 text-tekst-daempet" strokeWidth={1.75} />
               {lead.virksomhedsnavn}
             </h1>
             <p className="mt-1 text-sm text-tekst-daempet">
@@ -217,7 +228,10 @@ export default async function LeadDetaljeSide({
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="flex flex-col gap-6 lg:col-span-2">
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-tekst">Stamdata</h2>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <IdCard className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Stamdata
+              </h2>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Felt label="Status" vaerdi={lead.status} />
                 <Felt label="Branchekode" vaerdi={lead.branchekode} />
@@ -232,7 +246,10 @@ export default async function LeadDetaljeSide({
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-tekst">Kontaktperson</h2>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <UserRound className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Kontaktperson
+              </h2>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <Felt label="Navn" vaerdi={lead.kontaktperson_navn} />
                 <Felt label="Titel" vaerdi={lead.kontaktperson_titel} />
@@ -240,7 +257,10 @@ export default async function LeadDetaljeSide({
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-tekst">Kvalificering</h2>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <ClipboardCheck className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Kvalificering
+              </h2>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Felt label="Fit" vaerdi={lead.fit} />
                 <Felt label="Behov" vaerdi={lead.behov} />
@@ -257,7 +277,8 @@ export default async function LeadDetaljeSide({
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-tekst">
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <Sparkles className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
                 AI-felter <span className="text-tekst-daempet">— ikke verificeret</span>
               </h2>
               <div className="flex flex-col gap-2">
@@ -268,7 +289,10 @@ export default async function LeadDetaljeSide({
             </section>
 
             <section>
-              <h2 className="mb-2 text-sm font-semibold text-tekst">Historik</h2>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <History className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Historik
+              </h2>
               {(!log || log.length === 0) && (
                 <p className="text-sm text-tekst-daempet">Ingen ændringer registreret endnu.</p>
               )}
@@ -294,7 +318,10 @@ export default async function LeadDetaljeSide({
             </section>
 
             <section>
-              <h2 className="mb-1 text-sm font-semibold text-tekst">Snapshot-historik</h2>
+              <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <Camera className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Snapshot-historik
+              </h2>
               <p className="mb-2 text-xs text-tekst-daempet">
                 Ændringer fundet ved geninport af CVR-data (adskilt fra manuelle redigeringer
                 ovenfor i Historik).
@@ -335,7 +362,10 @@ export default async function LeadDetaljeSide({
           </div>
 
           <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-tekst">Beregnede felter</h2>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Calculator className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Beregnede felter
+            </h2>
             <Felt
               label="Må kontaktes"
               vaerdi={lead.maa_kontaktes ? "Ja" : "Nej, spærret"}

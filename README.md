@@ -31,6 +31,16 @@ men spørg ikke om lov til selve `git push` eller `vercel deploy --prod`.
 Vercel er endnu ikke koblet til GitHub-reposet (auto-deploy ved push) — kun
 foreslået, ikke bekræftet.
 
+**Sidste session (2026-08-14):** Ikoner tilføjet i hele appen (sidebar, Indstillinger,
+brugermenu, sideoverskrifter, stat-kort) via `lucide-react` (nyt, eneste tilføjede
+afhængighed denne gang — se "Teknisk stack"). Samtidig fik alle store informationskort
+(dashboard-kort, ringeliste-kandidater, kunde-/lead-detaljesektioner, tema-forhåndsvisninger
+osv.) en fælles hover-"pop": orange kant + let løft, defineret én gang som `.kort-hover` i
+`app/globals.css` og genbrugt overalt — tilføj den klasse til nye kort fremover i stedet for
+at opfinde en ny hover-stil. `lib/nav.ts`s `NavPunkt` har nu et `Ikon: LucideIcon`-felt;
+følg samme mønster (ikon-komponent direkte i datastrukturen, ikke en separat mapping) hvis
+der tilføjes flere ikon-bærende lister.
+
 **Sidst foreslået, ikke bekræftet endnu:** Om Vercel skal forbindes til
 GitHub-reposet for auto-deploy ved push (i stedet for manuel `vercel deploy --prod`).
 Ellers intet — Etape 6 og 7B er nu begge færdige (se status-tabellen), og
@@ -290,7 +300,9 @@ brugerdefineret tema) og `profil-billeder` (avatarer, 5 MB-grænse). Begge har:
   projektets start.
 - **Tailwind CSS** — til designet, med farverne som CSS-variabler (se nedenfor).
 - **react-colorful** — let (~2,8 kB) farvevælger-komponent til det brugerdefinerede
-  tema i Indstillinger. Eneste UI-bibliotek i projektet ud over Tailwind.
+  tema i Indstillinger.
+- **lucide-react** — ikonbibliotek, brugt konsekvent i hele appen (sidebar, Indstillinger,
+  sideoverskrifter, stat-kort). De eneste to UI-biblioteker i projektet ud over Tailwind.
 
 Valgt fordi det er den simpleste stack, der dækker behovet: server-side
 rendering uden en separat backend, og Vercel (valgt hosting) er bygget til

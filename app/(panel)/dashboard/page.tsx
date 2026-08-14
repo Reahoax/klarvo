@@ -1,4 +1,16 @@
 import Link from "next/link";
+import {
+  Building2,
+  ClipboardCheck,
+  PhoneCall,
+  Handshake,
+  ListChecks,
+  GitBranch,
+  PhoneForwarded,
+  Users,
+  Activity,
+  type LucideIcon,
+} from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_FARVE, PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 
@@ -44,30 +56,38 @@ function StatKort({
   label,
   vaerdi,
   undertekst,
+  Ikon,
   fremhaevet = false,
 }: {
   label: string;
   vaerdi: string | number;
   undertekst?: string;
+  Ikon: LucideIcon;
   fremhaevet?: boolean;
 }) {
   return (
     <div
       className={
         fremhaevet
-          ? "glow-accent-blod rounded-lg bg-accent p-4 text-accent-tekst"
-          : "rounded-lg border border-kant bg-flade p-4"
+          ? "kort-hover glow-accent-blod rounded-lg bg-accent p-4 text-accent-tekst"
+          : "kort-hover rounded-lg border border-kant bg-flade p-4"
       }
     >
-      <p
-        className={
-          fremhaevet
-            ? "text-[11px] uppercase tracking-wide text-accent-tekst/80"
-            : "text-[11px] uppercase tracking-wide text-tekst-daempet"
-        }
-      >
-        {label}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p
+          className={
+            fremhaevet
+              ? "text-[11px] uppercase tracking-wide text-accent-tekst/80"
+              : "text-[11px] uppercase tracking-wide text-tekst-daempet"
+          }
+        >
+          {label}
+        </p>
+        <Ikon
+          className={fremhaevet ? "h-4 w-4 shrink-0 text-accent-tekst/70" : "h-4 w-4 shrink-0 text-tekst-daempet/60"}
+          strokeWidth={1.75}
+        />
+      </div>
       <p className="tal mt-1 text-2xl font-semibold">{vaerdi}</p>
       {undertekst && (
         <p
@@ -207,9 +227,10 @@ export default async function DashboardSide() {
           </p>
         </div>
 
-        <div className="rounded-lg border border-kant bg-flade p-4">
+        <div className="kort-hover rounded-lg border border-kant bg-flade p-4">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-[11px] uppercase tracking-wide text-tekst-daempet">
+            <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-tekst-daempet">
+              <ListChecks className="h-3.5 w-3.5" strokeWidth={1.75} />
               Dagens overblik
             </p>
           </div>
@@ -245,6 +266,7 @@ export default async function DashboardSide() {
             label="Leads i alt"
             vaerdi={leadsIAlt}
             undertekst={`${antalPrStadie.ny ?? 0} nye siden import`}
+            Ikon={Building2}
           />
           <StatKort
             label="Kvalificerede"
@@ -252,24 +274,30 @@ export default async function DashboardSide() {
             undertekst={
               leadsIAlt > 0 ? `${Math.round((kvalificerede / leadsIAlt) * 100)}% af alle leads` : "Ingen leads endnu"
             }
+            Ikon={ClipboardCheck}
           />
           <StatKort
             label="Godkendt til ringeliste"
             vaerdi={godkendteTilRingeliste}
             undertekst={`${ringIgenListe.length} venter på genringning`}
+            Ikon={PhoneCall}
             fremhaevet
           />
           <StatKort
             label="Aktive kunder"
             vaerdi={kundeListe.length}
             undertekst={dpaMangler > 0 ? `${dpaMangler} mangler DPA` : "Alle har underskrevet DPA"}
+            Ikon={Handshake}
           />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-lg border border-kant bg-flade p-4">
+          <section className="kort-hover rounded-lg border border-kant bg-flade p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-tekst">Pipeline-status</h2>
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <GitBranch className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Pipeline-status
+              </h2>
               <Link href="/leads" className="text-xs text-accent hover:underline">
                 Se alle leads →
               </Link>
@@ -309,9 +337,12 @@ export default async function DashboardSide() {
             </ul>
           </section>
 
-          <section className="rounded-lg border border-kant bg-flade p-4">
+          <section className="kort-hover rounded-lg border border-kant bg-flade p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-tekst">Ring igen i dag</h2>
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <PhoneForwarded className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Ring igen i dag
+              </h2>
               <Link href="/ringeliste" className="text-xs text-accent hover:underline">
                 Åbn ringeliste →
               </Link>
@@ -343,8 +374,11 @@ export default async function DashboardSide() {
             )}
           </section>
 
-          <section className="rounded-lg border border-kant bg-flade p-4">
-            <h2 className="mb-3 text-sm font-semibold text-tekst">Kunde-snapshot</h2>
+          <section className="kort-hover rounded-lg border border-kant bg-flade p-4">
+            <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Users className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Kunde-snapshot
+            </h2>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-wide text-tekst-daempet">
@@ -375,8 +409,11 @@ export default async function DashboardSide() {
             </div>
           </section>
 
-          <section className="rounded-lg border border-kant bg-flade p-4">
-            <h2 className="mb-3 text-sm font-semibold text-tekst">Seneste aktivitet</h2>
+          <section className="kort-hover rounded-lg border border-kant bg-flade p-4">
+            <h2 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Activity className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Seneste aktivitet
+            </h2>
             {aktivitetsListe.length === 0 ? (
               <p className="text-sm text-tekst-daempet">Ingen aktivitet endnu.</p>
             ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Settings, LogOut } from "lucide-react";
 import { IndstillingerModal } from "./indstillinger-modal";
 
 type Konfiguration = {
@@ -58,15 +59,17 @@ export function BrugerMenu({
               setAaben(false);
               setIndstillingerAaben(true);
             }}
-            className="block w-full px-3 py-2 text-left text-sm text-tekst transition-colors hover:bg-flade-haevet"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-tekst transition-colors hover:bg-flade-haevet"
           >
+            <Settings className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
             Indstillinger
           </button>
           <form action={logUd}>
             <button
               type="submit"
-              className="block w-full px-3 py-2 text-left text-sm text-spaerret transition-colors hover:bg-flade-haevet"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-spaerret transition-colors hover:bg-flade-haevet"
             >
+              <LogOut className="h-4 w-4" strokeWidth={1.75} />
               Log ud
             </button>
           </form>

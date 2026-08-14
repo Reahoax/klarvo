@@ -1,3 +1,4 @@
+import { Upload } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { ImporterForm } from "./importer-form";
 
@@ -15,7 +16,10 @@ export default async function ImporterSide() {
 
   return (
     <div className="max-w-2xl p-6">
-      <h1 className="text-lg font-semibold text-tekst">Importér leads</h1>
+      <h1 className="flex items-center gap-2 text-lg font-semibold text-tekst">
+        <Upload className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+        Importér leads
+      </h1>
       <p className="mb-6 text-sm text-tekst-daempet">
         Upload en CSV-udtræksfil fra cvr.dk. Importen er bred inden for filen - hvilke leads I
         faktisk arbejder videre med, vælges bagefter i leadtabellen.

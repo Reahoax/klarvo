@@ -25,8 +25,9 @@ export function SidebarNav() {
                     key={punkt.bogstav}
                     aria-disabled="true"
                     title="Ikke bygget endnu"
-                    className="cursor-not-allowed rounded border-l-2 border-transparent py-1.5 pl-[7px] pr-2 text-sm text-tekst-daempet/50"
+                    className="flex cursor-not-allowed items-center gap-2 rounded border-l-2 border-transparent py-1.5 pl-[7px] pr-2 text-sm text-tekst-daempet/50"
                   >
+                    <punkt.Ikon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                     {punkt.navn}
                   </span>
                 );
@@ -38,10 +39,11 @@ export function SidebarNav() {
                   href={punkt.href!}
                   className={
                     erValgt
-                      ? "rounded border-l-2 border-accent bg-flade-haevet py-1.5 pl-[7px] pr-2 text-sm font-medium text-tekst transition-all duration-200 ease-out"
-                      : "group rounded border-l-2 border-transparent py-1.5 pl-[7px] pr-2 text-sm text-tekst-daempet transition-all duration-200 ease-out hover:translate-x-0.5 hover:bg-flade-haevet hover:text-tekst"
+                      ? "flex items-center gap-2 rounded border-l-2 border-accent bg-flade-haevet py-1.5 pl-[7px] pr-2 text-sm font-medium text-tekst transition-all duration-200 ease-out"
+                      : "group flex items-center gap-2 rounded border-l-2 border-transparent py-1.5 pl-[7px] pr-2 text-sm text-tekst-daempet transition-all duration-200 ease-out hover:translate-x-0.5 hover:bg-flade-haevet hover:text-tekst"
                   }
                 >
+                  <punkt.Ikon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                   {punkt.navn}
                 </Link>
               );

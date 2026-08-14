@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { UserRound, Palette, Scale, Info, type LucideIcon } from "lucide-react";
 import {
   opdaterNavn,
   opdaterAvatar,
@@ -63,10 +64,12 @@ export function IndstillingerModal({
     return () => window.removeEventListener("keydown", paaEscape);
   }, [onLuk]);
 
-  const punkter: { id: Sektion; label: string }[] = [
-    { id: "konto", label: "Konto" },
-    { id: "udseende", label: "Udseende" },
-    ...(erEjer ? ([{ id: "forretningsregler", label: "Forretningsregler" }] as const) : []),
+  const punkter: { id: Sektion; label: string; Ikon: LucideIcon }[] = [
+    { id: "konto", label: "Konto", Ikon: UserRound },
+    { id: "udseende", label: "Udseende", Ikon: Palette },
+    ...(erEjer
+      ? ([{ id: "forretningsregler", label: "Forretningsregler", Ikon: Scale }] as const)
+      : []),
   ];
 
   return (
@@ -84,10 +87,11 @@ export function IndstillingerModal({
                   onClick={() => setSektion(p.id)}
                   className={
                     sektion === p.id
-                      ? "block w-full rounded-md bg-flade-haevet px-3 py-1.5 text-left text-sm font-medium text-tekst"
-                      : "block w-full rounded-md px-3 py-1.5 text-left text-sm text-tekst-daempet transition-colors hover:bg-flade-haevet hover:text-tekst"
+                      ? "flex w-full items-center gap-2 rounded-md bg-flade-haevet px-3 py-1.5 text-left text-sm font-medium text-tekst"
+                      : "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-tekst-daempet transition-colors hover:bg-flade-haevet hover:text-tekst"
                   }
                 >
+                  <p.Ikon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
                   {p.label}
                 </button>
               </li>
@@ -188,7 +192,10 @@ function KontoSektion({
   return (
     <div className="flex flex-col gap-8">
       <section>
-        <h1 className="mb-4 text-lg font-semibold text-tekst">Konto</h1>
+        <h1 className="mb-4 flex items-center gap-2 text-lg font-semibold text-tekst">
+          <UserRound className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+          Konto
+        </h1>
         <p className="text-sm text-tekst">{email}</p>
         <p className="text-xs text-tekst-daempet">{rolle === "ejer" ? "Ejer" : "Operatør"}</p>
       </section>
@@ -299,7 +306,10 @@ function KontoSektion({
 function UdseendeSektion() {
   return (
     <div>
-      <h1 className="mb-4 text-lg font-semibold text-tekst">Udseende</h1>
+      <h1 className="mb-4 flex items-center gap-2 text-lg font-semibold text-tekst">
+        <Palette className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+        Udseende
+      </h1>
       <TemaVaelger />
     </div>
   );
@@ -384,15 +394,18 @@ function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfigurat
     <div>
       {infoAaben && <ForretningsreglerInfoPopup onLuk={lukInfo} />}
       <div className="mb-1 flex items-center gap-1.5">
-        <h1 className="text-lg font-semibold text-tekst">Forretningsregler</h1>
+        <h1 className="flex items-center gap-2 text-lg font-semibold text-tekst">
+          <Scale className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+          Forretningsregler
+        </h1>
         <button
           type="button"
           onClick={() => setInfoAaben(true)}
           title="Hvad betyder felterne?"
           aria-label="Hvad betyder felterne?"
-          className="flex h-4 w-4 items-center justify-center rounded-full border border-tekst-daempet text-[10px] font-semibold leading-none text-tekst-daempet transition-colors hover:border-accent hover:text-accent"
+          className="flex h-5 w-5 items-center justify-center rounded-full border border-tekst-daempet text-tekst-daempet transition-colors hover:border-accent hover:text-accent"
         >
-          i
+          <Info className="h-3.5 w-3.5" strokeWidth={2} />
         </button>
       </div>
       <p className="mb-4 text-sm text-tekst-daempet">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import {
   anvendLeadsFiltre,
@@ -121,7 +122,10 @@ export default async function LeadsSide({
       <div className="px-6 py-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-tekst">Leads</h1>
+            <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+              <Building2 className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+              Leads
+            </h1>
             <p className="mt-1 text-sm text-tekst-daempet">
               Her filtrerer og finder du leads. Klik på et lead for at se al historik.
             </p>
@@ -135,19 +139,19 @@ export default async function LeadsSide({
         </div>
 
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-kant bg-flade p-4 transition-colors hover:border-tekst-daempet/40">
+          <div className="kort-hover rounded-lg border border-kant bg-flade p-4">
             <p className="text-[11px] uppercase tracking-wide text-tekst-daempet">Leads i alt</p>
             <p className="tal mt-2 text-2xl font-semibold text-tekst">{antalTotal ?? 0}</p>
           </div>
-          <div className="rounded-lg border border-kant bg-flade p-4 transition-colors hover:border-tekst-daempet/40">
+          <div className="kort-hover rounded-lg border border-kant bg-flade p-4">
             <p className="text-[11px] uppercase tracking-wide text-tekst-daempet">Kvalificerede</p>
             <p className="tal mt-2 text-2xl font-semibold text-tekst">{antalKvalificeret ?? 0}</p>
           </div>
-          <div className="rounded-lg border border-kant bg-flade p-4 transition-colors hover:border-tekst-daempet/40">
+          <div className="kort-hover rounded-lg border border-kant bg-flade p-4">
             <p className="text-[11px] uppercase tracking-wide text-tekst-daempet">Må kontaktes</p>
             <p className="tal mt-2 text-2xl font-semibold text-tekst">{antalMaaKontaktes}</p>
           </div>
-          <div className="glow-accent-blod rounded-lg bg-accent p-4">
+          <div className="kort-hover glow-accent-blod rounded-lg bg-accent p-4">
             <p className="text-[11px] uppercase tracking-wide text-accent-tekst/80">
               Kvalificeringsrate
             </p>

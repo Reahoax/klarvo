@@ -99,6 +99,19 @@ body {
   box-shadow: 0 4px 24px -6px rgb(var(--farve-accent) / 0.5);
 }
 
+/* Hover-"pop" til de store informationskort i hele appen (dashboard-kort,
+   ringeliste-kandidater, kundekort osv.) - orange kant + et lille løft, samme
+   accentsprog som .glow-accent men til statiske kort, der ikke i sig selv er
+   knapper. */
+.kort-hover {
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+.kort-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgb(var(--farve-accent));
+  box-shadow: 0 10px 28px -10px rgb(var(--farve-accent) / 0.35);
+}
+
 /* Ensretter udseendet af checkbokse og radioknapper med resten af paletten
    (native accent-color, ingen håndrullet erstatningskomponent nødvendig),
    og gør dem lidt større så de er lettere at ramme/se i filterpanelet. */

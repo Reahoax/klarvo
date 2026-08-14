@@ -1,3 +1,4 @@
+import { ClipboardCheck } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { KvalificeringsKort } from "./kvalificerings-kort";
 
@@ -45,7 +46,10 @@ export default async function KvalificeringSide() {
       </div>
 
       <div className="mx-auto max-w-xl px-6 py-6">
-        <h1 className="text-xl font-semibold text-tekst">Kvalificering</h1>
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+          <ClipboardCheck className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+          Kvalificering
+        </h1>
         <p className="mb-6 mt-1 text-sm text-tekst-daempet">
           Her afgør du, om et lead er kvalificeret. Besvar Fit, Behov, Økonomi og Person for
           hvert lead — kvalificeret beregnes automatisk, kun hvis alle fire er Ja.

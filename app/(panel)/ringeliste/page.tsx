@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PhoneCall } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { erIndenforRingetid } from "@/lib/leads/ringetid.ts";
 import { INDVENDINGER } from "@/lib/leads/indvendinger.ts";
@@ -106,7 +107,10 @@ export default async function RingelisteSide() {
           <span>Ringeliste</span>
         </div>
         <div className="mx-auto max-w-2xl px-6 py-6">
-          <h1 className="text-xl font-semibold text-tekst">Ringeliste</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+          <PhoneCall className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+          Ringeliste
+        </h1>
           <div className="mt-6 rounded-lg border border-advarsel/40 bg-advarsel-baggrund px-6 py-10 text-center">
             <p className="text-sm text-advarsel">
               Uden for ringetid — ringelisten er skjult.
@@ -131,7 +135,10 @@ export default async function RingelisteSide() {
       </div>
 
       <div className="mx-auto max-w-2xl px-6 py-6">
-        <h1 className="text-xl font-semibold text-tekst">Ringeliste</h1>
+        <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+          <PhoneCall className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+          Ringeliste
+        </h1>
         <p className="mb-6 mt-1 text-sm text-tekst-daempet">
           Godkendte, kvalificerede leads klar til opkald. Vælg et udfald for hvert opkald —
           leadet forlader listen, når det er afgjort, eller flyttes til den valgte dato ved
@@ -166,7 +173,7 @@ export default async function RingelisteSide() {
                 <form
                   key={k.id}
                   action={gemAktivitet}
-                  className="rounded-lg border border-kant bg-flade p-5"
+                  className="kort-hover rounded-lg border border-kant bg-flade p-5"
                 >
                   <input type="hidden" name="leadId" value={k.id} />
                   <input type="hidden" name="kundeId" value={k.kunde_id ?? ""} />

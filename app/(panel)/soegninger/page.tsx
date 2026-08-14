@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 
 type SoegningRaekke = {
@@ -18,7 +19,10 @@ export default async function SoegningerSide() {
 
   return (
     <div className="p-6">
-      <h1 className="text-lg font-semibold text-tekst">Søgninger</h1>
+      <h1 className="flex items-center gap-2 text-lg font-semibold text-tekst">
+        <Search className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+        Søgninger
+      </h1>
       <p className="mb-6 text-sm text-tekst-daempet">
         Her ser du alle gemte søgninger og hvor mange leads hver af dem gav. Hver import fra
         Etape 2 opretter automatisk en søgning her.

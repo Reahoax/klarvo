@@ -1,4 +1,15 @@
 import Link from "next/link";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  PiggyBank,
+  Receipt,
+  LineChart,
+  ListOrdered,
+  FileText,
+  type LucideIcon,
+} from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { LinjeGraf } from "./linje-graf";
 import { OekonomiFormular } from "./okonomi-formular";
@@ -50,20 +61,31 @@ function StatKort({
   label,
   vaerdi,
   undertekst,
+  Ikon,
   fremhaevet,
 }: {
   label: string;
   vaerdi: string | number;
   undertekst?: string;
+  Ikon: LucideIcon;
   fremhaevet?: "positiv" | "negativ";
 }) {
   const bg =
     fremhaevet === "positiv" ? "bg-godkendt" : fremhaevet === "negativ" ? "bg-spaerret" : null;
   return (
-    <div className={bg ? `glow-accent-blod rounded-lg ${bg} p-4 text-accent-tekst` : "rounded-lg border border-kant bg-flade p-4"}>
-      <p className={bg ? "text-[11px] uppercase tracking-wide text-accent-tekst/80" : "text-[11px] uppercase tracking-wide text-tekst-daempet"}>
-        {label}
-      </p>
+    <div
+      className={
+        bg
+          ? `kort-hover glow-accent-blod rounded-lg ${bg} p-4 text-accent-tekst`
+          : "kort-hover rounded-lg border border-kant bg-flade p-4"
+      }
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className={bg ? "text-[11px] uppercase tracking-wide text-accent-tekst/80" : "text-[11px] uppercase tracking-wide text-tekst-daempet"}>
+          {label}
+        </p>
+        <Ikon className={bg ? "h-4 w-4 shrink-0 text-accent-tekst/70" : "h-4 w-4 shrink-0 text-tekst-daempet/60"} strokeWidth={1.75} />
+      </div>
       <p className="tal mt-1 text-2xl font-semibold">{vaerdi}</p>
       {undertekst && (
         <p className={bg ? "mt-0.5 text-xs text-accent-tekst/70" : "mt-0.5 text-xs text-tekst-daempet"}>
@@ -193,7 +215,10 @@ export default async function OekonomiSide() {
 
       <div className="flex flex-col gap-6 px-6 py-6">
         <div>
-          <h1 className="text-xl font-semibold text-tekst">Økonomi</h1>
+          <h1 className="flex items-center gap-2 text-xl font-semibold text-tekst">
+            <Wallet className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+            Økonomi
+          </h1>
           <p className="mt-1 text-sm text-tekst-daempet">
             Kun synlig for ejere. Indkomst lægger automatisk kundernes kontraktværdi
             (pris/møde × møder i saldo, spredt over kontraktperioden) sammen med det,
@@ -206,29 +231,36 @@ export default async function OekonomiSide() {
             label="Månedlig indkomst"
             vaerdi={formatKr(maanedligIndkomst)}
             undertekst={`${formatKr(kundeMdrIndkomst)} fra kunder + ${formatKr(loggetMdrIndkomst)} logget`}
+            Ikon={TrendingUp}
           />
           <StatKort
             label="Månedligt forbrug"
             vaerdi={formatKr(maanedligtForbrug)}
             undertekst="Denne måneds engangsposter + tilbagevendende"
+            Ikon={TrendingDown}
           />
           <StatKort
             label="Årsindkomst"
             vaerdi={formatKr(aarsIndkomst)}
             undertekst={`${formatKr(kundeAarsIndkomst)} fra kunder + ${formatKr(loggetAarsIndkomst)} logget`}
+            Ikon={PiggyBank}
             fremhaevet="positiv"
           />
           <StatKort
             label="Årsforbrug"
             vaerdi={formatKr(aarsForbrug)}
             undertekst={`${iAar} — engangs + tilbagevendende × 12`}
+            Ikon={Receipt}
             fremhaevet={aarsForbrug > aarsIndkomst ? "negativ" : undefined}
           />
         </div>
 
-        <section className="rounded-lg border border-kant bg-flade p-4">
+        <section className="kort-hover rounded-lg border border-kant bg-flade p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-tekst">Indtægt vs. forbrug, seneste 6 måneder</h2>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <LineChart className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Indtægt vs. forbrug, seneste 6 måneder
+            </h2>
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1 text-tekst-daempet">
                 <span className="h-2 w-2 rounded-full bg-godkendt" /> Indtægt
@@ -241,9 +273,12 @@ export default async function OekonomiSide() {
           <LinjeGraf punkter={graf} />
         </section>
 
-        <section className="rounded-lg border border-kant bg-flade p-4">
+        <section className="kort-hover rounded-lg border border-kant bg-flade p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-tekst">Loggede poster</h2>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <ListOrdered className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Loggede poster
+            </h2>
           </div>
 
           <OekonomiFormular />
@@ -306,9 +341,12 @@ export default async function OekonomiSide() {
           )}
         </section>
 
-        <section className="rounded-lg border border-kant bg-flade">
+        <section className="kort-hover rounded-lg border border-kant bg-flade">
           <div className="flex items-center justify-between border-b border-kant px-4 py-3">
-            <h2 className="text-sm font-semibold text-tekst">Kontraktoversigt (kunder)</h2>
+            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <FileText className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              Kontraktoversigt (kunder)
+            </h2>
             <span className="text-[11px] uppercase tracking-wide text-tekst-daempet">
               {formatKr(samletKontraktvaerdi)} i alt · {samletSaldo} møder i saldo
             </span>

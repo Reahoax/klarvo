@@ -133,7 +133,7 @@ export function TemaVaelger() {
           className={
             tilstand === "moerk"
               ? "glow-accent rounded-lg border-2 border-accent bg-flade p-3 text-left"
-              : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
+              : "kort-hover rounded-lg border-2 border-kant bg-flade p-3 text-left"
           }
         >
           <div className="mb-2 h-12 rounded border border-[#2a2a2d] bg-[#0b0b0c]" />
@@ -147,7 +147,7 @@ export function TemaVaelger() {
           className={
             tilstand === "lys"
               ? "glow-accent rounded-lg border-2 border-accent bg-flade p-3 text-left"
-              : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
+              : "kort-hover rounded-lg border-2 border-kant bg-flade p-3 text-left"
           }
         >
           <div className="mb-2 h-12 rounded border border-[#e3e2de] bg-[#f7f7f5]" />
@@ -161,7 +161,7 @@ export function TemaVaelger() {
           className={
             tilstand === "brugerdefineret"
               ? "glow-accent rounded-lg border-2 border-accent bg-flade p-3 text-left"
-              : "rounded-lg border-2 border-kant bg-flade p-3 text-left transition-colors hover:border-tekst-daempet"
+              : "kort-hover rounded-lg border-2 border-kant bg-flade p-3 text-left"
           }
         >
           <div className="mb-2 h-12 overflow-hidden rounded border border-kant">
