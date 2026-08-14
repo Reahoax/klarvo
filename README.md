@@ -126,7 +126,26 @@ Projektet fik sit første git-repo (se "Git" ovenfor). Se "Udover Spec.md" og
   før man sender et `change`-event virker fint og er blevet brugt med succes
   flere gange (se fx hvordan billedupload til `tema-baggrunde` og CSV-import
   er testet i sessionerne 2026-08-13).
-- Kør `npm run build` og `npm test` før hver deploy/push.
+- Kør `npm run build` og `npm test` før hver deploy/push. Kør dem ALDRIG mens
+  en `npm run dev`-forhåndsvisning kører samtidig i samme mappe — begge deler
+  `.next`-cachen, og en produktions-build midt i en kørende dev-session
+  korrumperer den (viser sig som "Cannot find module './xxx.js'" eller
+  "__webpack_modules__[moduleId] is not a function" i dev-serverens logs).
+  Ramt 2026-08-14 under test af bookingflowet; løst med `rm -rf .next` og en
+  frisk `preview_start`. Stop forhåndsvisningen eller kør build/test i en
+  anden mappe/gren, hvis begge er nødvendige i samme session.
+- **Klient-tilstand der skal overleve en server-genhentning må ikke eje af en
+  komponent, hvis eksistens afhænger af de data, handlingen selv ændrer.**
+  Ramt konkret i bookingmodalen (Etape 10, 2026-08-14): en "Møde booket"-modal
+  der viste en bekræftelsestekst efter en vellykket booking blev først lagt
+  inde i hvert ringeliste-kandidatkort — men en vellykket booking lukker
+  leadet, kandidaten forsvinder fra `ringeliste_kandidater` ved den
+  automatiske genhentning som Next.js kører efter en server action, og kortet
+  (og dermed modal-tilstanden) blev afmonteret midt i det hele. Løsningen var
+  at flytte modal-tilstanden op i en stabil forælder-klientkomponent
+  (`kandidat-liste.tsx`), der altid rendres uanset kandidatlistens indhold —
+  se dens kommentar for detaljen. Genbrug det mønster for lignende
+  "handling fjerner sit eget UI"-scenarier.
 
 ## Status
 
@@ -136,13 +155,13 @@ Projektet fik sit første git-repo (se "Git" ovenfor). Se "Udover Spec.md" og
 | 2 — Import | Bygget: CSV-import, R1/R3/R4, dublet-håndtering, telefonnormalisering |
 | 3 — Leadvisning og filtre | Bygget: filtrering, sortering, søgning, detaljevisning + historik. Branche-/geografifiltre (DB07-træ) mangler — kræver referencedata vi ikke har |
 | 4 — Kvalificeringskø | Bygget: ét lead ad gangen, tastaturgenveje (1-8, "?" for oversigt) |
-| 6 — Godkendelse og ringeliste | Bygget (2026-08-13): godkendelse, ringeliste, 5 udfald, genringning (maks. 4 forsøg), ringetidsvindue (default hverdage 9-16, `lib/leads/ringetid.ts`, redigeres i Indstillinger → Forretningsregler), indvendingslog (fast liste, `lib/leads/indvendinger.ts`, kun ved "Lagde på"/"Ikke interesseret"), opkaldsmanuskripter pr. kunde med versionering (`manuskripter`-tabel, redigeres på kundedetaljer, vist i ringelisten, version logges på hvert opkald). Manuskripter pr. *segment* har kun fået sin databasekolonne (`segment_id`) — ingen UI endnu, da leads ikke tildeles segmenter automatisk (Etape 9). "Møde booket" er stadig kun deaktiveret indtil et lead kan tildeles en kunde |
+| 6 — Godkendelse og ringeliste | Bygget (2026-08-13): godkendelse, ringeliste, 5 udfald, genringning (maks. 4 forsøg), ringetidsvindue (default hverdage 9-16, `lib/leads/ringetid.ts`, redigeres i Indstillinger → Forretningsregler), indvendingslog (fast liste, `lib/leads/indvendinger.ts`, kun ved "Lagde på"/"Ikke interesseret"), opkaldsmanuskripter pr. kunde med versionering (`manuskripter`-tabel, redigeres på kundedetaljer, vist i ringelisten, version logges på hvert opkald). Manuskripter pr. *segment* har kun fået sin databasekolonne (`segment_id`) — ingen UI endnu, da leads ikke tildeles segmenter automatisk (Etape 9). "Møde booket" er stadig kun deaktiveret indtil et lead kan tildeles en kunde (Matching, Etape 9) |
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
 | 11 — CVR API-integration | Ikke bygget — afventer brugeroplysninger fra Erhvervsstyrelsens system-til-system-adgang |
 | 8, 9, 12 | Ikke bygget endnu |
-| 10 — Møder og saldo | Delvist: saldo-siden af skærmbillede H findes nu på Økonomi-siden (se "Udover Spec.md"), men selve bookingflowet ("Møde booket" → formular, kvalitetstjek, mødestatus) er ikke bygget |
+| 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
 **Udover Spec.md:**
 - Kanban-visning af leads (`?visning=kanban`), klikbar pipeline-status på

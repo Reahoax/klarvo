@@ -3,6 +3,7 @@ import {
   Building2,
   ClipboardCheck,
   PhoneCall,
+  CalendarCheck,
   Handshake,
   Shuffle,
   Target,
@@ -39,6 +40,7 @@ export const navGrupper: NavGruppe[] = [
       { bogstav: "B", navn: "Leads", href: "/leads", Ikon: Building2 },
       { bogstav: "C", navn: "Kvalificering", href: "/kvalificering", Ikon: ClipboardCheck },
       { bogstav: "D", navn: "Ringeliste", href: "/ringeliste", Ikon: PhoneCall },
+      { bogstav: "H", navn: "Møder", href: "/moeder", Ikon: CalendarCheck },
     ],
   },
   {

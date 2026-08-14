@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { INDVENDINGER, UDFALD_MED_INDVENDING } from "@/lib/leads/indvendinger.ts";
+import { genererBekraeftelsestekst, type MoedeForm } from "@/lib/moeder/bekraeftelsestekst.ts";
+
+const GYLDIGE_MOEDEFORMER = new Set(["fysisk", "online", "telefon"]);
 
 const GYLDIGE_UDFALD = [
   "ikke_kontakt",
@@ -84,4 +87,79 @@ export async function gemAktivitet(formData: FormData) {
   revalidatePath("/ringeliste");
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
+}
+
+// Etape 10 — Bookingflow (Spec.md 2A, skærmbillede H): opretter selve
+// møde-rækken (status "planlagt") ud over den almindelige opkalds-log, og
+// returnerer en bekræftelsestekst, som brugeren selv kopierer og sender -
+// systemet sender aldrig noget selv. Lukker leadet på samme måde som
+// gemAktivitet ville have gjort for udfaldet "moede_booket" (som også logges
+// her, så Historik/Ring igen-logikken forbliver konsistent med de andre
+// udfald).
+export async function bookMoede(
+  _forrigeState: { fejl?: string; ok?: boolean; bekraeftelsestekst?: string } | null,
+  formData: FormData
+): Promise<{ fejl?: string; ok?: boolean; bekraeftelsestekst?: string }> {
+  const leadId = String(formData.get("leadId") ?? "");
+  const kundeId = String(formData.get("kundeId") ?? "");
+  const virksomhedsnavn = String(formData.get("virksomhedsnavn") ?? "");
+  const datoTidRaa = String(formData.get("dato_tid") ?? "").trim();
+  const moedeForm = String(formData.get("form") ?? "");
+  const deltagerNavn = String(formData.get("deltager_navn") ?? "").trim();
+  const deltagerTitel = String(formData.get("deltager_titel") ?? "").trim();
+  const kontekstnote = String(formData.get("kontekstnote") ?? "").trim();
+
+  if (!leadId || !kundeId) {
+    return { fejl: "Leadet er ikke tilknyttet en kunde." };
+  }
+  if (!datoTidRaa) {
+    return { fejl: "Vælg dato og tid for mødet." };
+  }
+  if (!GYLDIGE_MOEDEFORMER.has(moedeForm)) {
+    return { fejl: "Vælg en mødeform." };
+  }
+
+  const datoTidIso = new Date(datoTidRaa).toISOString();
+
+  const supabase = await opretServerKlient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error: moedeFejl } = await supabase.from("moeder").insert({
+    lead_id: leadId,
+    kunde_id: kundeId,
+    status: "planlagt",
+    dato_tid: datoTidIso,
+    form: moedeForm,
+    deltager_navn: deltagerNavn || null,
+    deltager_titel: deltagerTitel || null,
+    kontekstnote: kontekstnote || null,
+  });
+  if (moedeFejl) return { fejl: moedeFejl.message };
+
+  await supabase.from("aktiviteter").insert({
+    lead_id: leadId,
+    kunde_id: kundeId,
+    udfald: "moede_booket",
+    bruger_id: user?.id ?? null,
+  });
+  await supabase.from("leads").update({ status_pipeline: "lukket" }).eq("id", leadId);
+
+  revalidatePath("/ringeliste");
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads");
+  revalidatePath("/moeder");
+  revalidatePath("/okonomi");
+  revalidatePath(`/kunder/${kundeId}`);
+
+  const bekraeftelsestekst = genererBekraeftelsestekst({
+    virksomhedsnavn,
+    deltagerNavn,
+    datoTid: datoTidIso,
+    form: moedeForm as MoedeForm,
+    kontekstnote,
+  });
+
+  return { ok: true, bekraeftelsestekst };
 }
