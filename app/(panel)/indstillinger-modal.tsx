@@ -1,12 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { UserRound, Palette, Scale, Info, type LucideIcon } from "lucide-react";
+import { UserRound, Palette, Scale, Info, Plug, Check, X, type LucideIcon } from "lucide-react";
 import {
   opdaterNavn,
   opdaterAvatar,
   skiftAdgangskode,
   gemForretningsregler,
+  gemCvrForbindelse,
+  afproevCvrForbindelse,
+  fjernCvrForbindelse,
 } from "./indstillinger-actions";
 import { TemaVaelger } from "./tema-vaelger";
 import { opretBrowserKlient } from "@/lib/supabase/client";
@@ -32,7 +35,15 @@ const UGEDAGE = [
   { tal: 7, label: "Søn" },
 ] as const;
 
-type Sektion = "konto" | "udseende" | "forretningsregler";
+type CvrForbindelse = {
+  brugernavn: string | null;
+  forbundet_tidspunkt: string | null;
+  sidst_testet: string | null;
+  sidst_test_ok: boolean | null;
+  sidst_test_besked: string | null;
+} | null;
+
+type Sektion = "konto" | "udseende" | "forretningsregler" | "integrationer";
 
 // Pop-op igen (2026-08-13): var kortvarigt en fuld side (/indstillinger), men
 // brugeren ville have den tilbage som pop-op - "ligesom her i Claude". Selve
@@ -44,6 +55,7 @@ export function IndstillingerModal({
   navn,
   avatarUrl,
   konfiguration,
+  cvrForbindelse,
   onLuk,
 }: {
   email: string | undefined;
@@ -51,6 +63,7 @@ export function IndstillingerModal({
   navn: string | null;
   avatarUrl: string | null;
   konfiguration: Konfiguration;
+  cvrForbindelse: CvrForbindelse;
   onLuk: () => void;
 }) {
   const erEjer = rolle === "ejer";
@@ -68,7 +81,10 @@ export function IndstillingerModal({
     { id: "konto", label: "Konto", Ikon: UserRound },
     { id: "udseende", label: "Udseende", Ikon: Palette },
     ...(erEjer
-      ? ([{ id: "forretningsregler", label: "Forretningsregler", Ikon: Scale }] as const)
+      ? ([
+          { id: "forretningsregler", label: "Forretningsregler", Ikon: Scale },
+          { id: "integrationer", label: "Integrationer", Ikon: Plug },
+        ] as const)
       : []),
   ];
 
@@ -117,6 +133,9 @@ export function IndstillingerModal({
             {sektion === "udseende" && <UdseendeSektion />}
             {sektion === "forretningsregler" && erEjer && (
               <ForretningsreglerSektion konfiguration={konfiguration} />
+            )}
+            {sektion === "integrationer" && erEjer && (
+              <IntegrationerSektion cvrForbindelse={cvrForbindelse} />
             )}
           </div>
         </div>
@@ -508,6 +527,171 @@ function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfigurat
         {state?.fejl && <p className="text-xs text-spaerret">{state.fejl}</p>}
         {state?.ok && <p className="text-xs text-godkendt">Gemt.</p>}
       </form>
+    </div>
+  );
+}
+
+// Etape 11 forberedelse — CVR system-til-system-adgang. Formularen forsvinder
+// og erstattes af en status-visning, så snart en forbindelse er gemt ("den
+// skal forsvinde", som brugeren bad om) - password'et vises aldrig igen,
+// hverken her eller nogen andre steder, og sendes aldrig til klienten fra
+// serveren (se cvr_forbindelse-migrationen: kun ejer-rollen kan overhovedet
+// læse rækken, og selv da henter layout.tsx bevidst ikke password-kolonnen).
+// Selve forbindelsen kører 24/7 i backend'en, uafhængigt af om nogen er
+// logget ind - gemmes den én gang, kan et senere datatræk (Etape 11) bruge
+// den når som helst.
+function IntegrationerSektion({ cvrForbindelse }: { cvrForbindelse: CvrForbindelse }) {
+  const [gemState, gemAction, gemPending] = useActionState(gemCvrForbindelse, null);
+  const [testPending, setTestPending] = useState(false);
+  const [testResultat, setTestResultat] = useState<{ ok: boolean; besked: string } | null>(null);
+  const [fjernPending, setFjernPending] = useState(false);
+  const [redigerer, setRedigerer] = useState(false);
+
+  // Kilden til sandhed er cvrForbindelse-prop'en fra serveren (opdateres via
+  // revalidatePath, efter gemAction er kørt færdig) - ikke gemState, som kun
+  // bruges til pending/fejl-visning mens formularen stadig er synlig.
+  const erForbundet = !!cvrForbindelse?.brugernavn && !redigerer;
+
+  async function haandterTest() {
+    setTestPending(true);
+    setTestResultat(null);
+    const resultat = await afproevCvrForbindelse();
+    setTestPending(false);
+    if (resultat.fejl) {
+      setTestResultat({ ok: false, besked: resultat.fejl });
+    } else {
+      setTestResultat({ ok: resultat.ok ?? false, besked: resultat.besked ?? "" });
+    }
+  }
+
+  async function haandterFjern() {
+    if (!confirm("Fjern den gemte CVR-forbindelse? Automatiske datatræk stopper, indtil den gemmes igen.")) {
+      return;
+    }
+    setFjernPending(true);
+    await fjernCvrForbindelse();
+    setFjernPending(false);
+  }
+
+  return (
+    <div>
+      <h1 className="mb-1 flex items-center gap-2 text-lg font-semibold text-tekst">
+        <Plug className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+        Integrationer
+      </h1>
+      <p className="mb-4 text-sm text-tekst-daempet">
+        Forbindelse til Erhvervsstyrelsens CVR system-til-system-adgang. Kun synlig for ejere.
+        Login gemmes sikkert i backend'en og bruges automatisk til fremtidige datatræk — I skal
+        ikke logge ind igen, hver gang appen bruges.
+      </p>
+
+      {erForbundet ? (
+        <div className="flex flex-col gap-4 rounded-lg border border-kant bg-flade p-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-godkendt/15">
+              <Check className="h-4 w-4 text-godkendt" strokeWidth={2.5} />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-tekst">
+                Forbundet som {cvrForbindelse?.brugernavn}
+              </p>
+              {cvrForbindelse?.forbundet_tidspunkt && (
+                <p className="text-xs text-tekst-daempet">
+                  Tilføjet {new Date(cvrForbindelse.forbundet_tidspunkt).toLocaleString("da-DK")}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {cvrForbindelse?.sidst_testet && (
+            <p className="text-xs text-tekst-daempet">
+              Sidst testet {new Date(cvrForbindelse.sidst_testet).toLocaleString("da-DK")} —{" "}
+              <span className={cvrForbindelse.sidst_test_ok ? "text-godkendt" : "text-spaerret"}>
+                {cvrForbindelse.sidst_test_besked}
+              </span>
+            </p>
+          )}
+
+          {testResultat && (
+            <p className={`text-xs ${testResultat.ok ? "text-godkendt" : "text-spaerret"}`}>
+              {testResultat.besked}
+            </p>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={haandterTest}
+              disabled={testPending}
+              className="rounded-md border border-kant px-3 py-1.5 text-sm text-tekst transition-colors hover:border-accent disabled:opacity-60"
+            >
+              {testPending ? "Tester…" : "Test forbindelse"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRedigerer(true)}
+              className="rounded-md border border-kant px-3 py-1.5 text-sm text-tekst transition-colors hover:border-accent"
+            >
+              Skift login
+            </button>
+            <button
+              type="button"
+              onClick={haandterFjern}
+              disabled={fjernPending}
+              className="flex items-center gap-1.5 rounded-md border border-kant px-3 py-1.5 text-sm text-tekst-daempet transition-colors hover:border-spaerret hover:text-spaerret disabled:opacity-60"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2} />
+              Fjern forbindelse
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form action={gemAction} className="flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-tekst-daempet">Brugernavn</span>
+            <input
+              type="text"
+              name="brugernavn"
+              autoComplete="off"
+              defaultValue={cvrForbindelse?.brugernavn ?? ""}
+              className="rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none transition-colors focus-visible:border-accent"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-tekst-daempet">Password</span>
+            <input
+              type="password"
+              name="password"
+              autoComplete="new-password"
+              placeholder={cvrForbindelse?.brugernavn ? "Skriv nyt password for at skifte" : undefined}
+              className="rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none transition-colors focus-visible:border-accent"
+            />
+          </label>
+          <p className="text-xs text-tekst-daempet">
+            Fra Erhvervsstyrelsens system-til-system-adgang (kontakt cvrselvbetjening@erst.dk for
+            login). Gemmes kun i backend'en — vises aldrig igen efter dette.
+          </p>
+          {gemState?.fejl && <p className="text-xs text-spaerret">{gemState.fejl}</p>}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={gemPending}
+              className="glow-accent w-fit rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-tekst disabled:opacity-60"
+            >
+              {gemPending ? "Forbinder…" : "Gem forbindelse"}
+            </button>
+            {redigerer && (
+              <button
+                type="button"
+                onClick={() => setRedigerer(false)}
+                className="rounded-md border border-kant px-3 py-1.5 text-sm text-tekst-daempet transition-colors hover:text-tekst"
+              >
+                Annullér
+              </button>
+            )}
+          </div>
+        </form>
+      )}
     </div>
   );
 }

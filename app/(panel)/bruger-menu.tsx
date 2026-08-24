@@ -13,12 +13,21 @@ type Konfiguration = {
   ringetid_ugedage: number[];
 } | null;
 
+type CvrForbindelse = {
+  brugernavn: string | null;
+  forbundet_tidspunkt: string | null;
+  sidst_testet: string | null;
+  sidst_test_ok: boolean | null;
+  sidst_test_besked: string | null;
+} | null;
+
 export function BrugerMenu({
   email,
   rolle,
   navn,
   avatarUrl,
   konfiguration,
+  cvrForbindelse,
   forbogstav,
   logUd,
 }: {
@@ -27,6 +36,7 @@ export function BrugerMenu({
   navn: string | null;
   avatarUrl: string | null;
   konfiguration: Konfiguration;
+  cvrForbindelse: CvrForbindelse;
   forbogstav: string;
   logUd: () => void;
 }) {
@@ -111,6 +121,7 @@ export function BrugerMenu({
           navn={navn}
           avatarUrl={avatarUrl}
           konfiguration={konfiguration}
+          cvrForbindelse={cvrForbindelse}
           onLuk={() => setIndstillingerAaben(false)}
         />
       )}

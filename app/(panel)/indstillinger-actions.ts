@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
+import { testCvrForbindelse } from "@/lib/cvr/klient.ts";
 
 // Kun "navn" kan skrives herfra - kolonne-rettighederne på profiler-tabellen
 // forhindrer at rolle (eller andet) kan ændres via dette eller et direkte API-kald.
@@ -72,6 +73,121 @@ export async function skiftAdgangskode(
   const { error } = await supabase.auth.updateUser({ password: nyKode });
 
   if (error) return { fejl: error.message };
+  return { ok: true };
+}
+
+// Bruges af alle tre CVR-forbindelse-actions - findes ét sted, så rollechecket
+// ikke kan komme til at afvige mellem dem.
+async function kraevEjer() {
+  const supabase = await opretServerKlient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { fejl: "Ikke logget ind." as const };
+
+  const { data: profil } = await supabase
+    .from("profiler")
+    .select("rolle")
+    .eq("id", user.id)
+    .single();
+  if (profil?.rolle !== "ejer") {
+    return { fejl: "Kun ejere kan ændre CVR-forbindelsen." as const };
+  }
+  return { supabase, brugerId: user.id };
+}
+
+// Gemmer credentials og tester forbindelsen med det samme, så brugeren får
+// besked, hvis login fejler, i stedet for at opdage det først ved næste
+// datatræk. Password'et returneres aldrig - kun status.
+export async function gemCvrForbindelse(
+  _forrigeState: { fejl?: string; ok?: boolean; testBesked?: string } | null,
+  formData: FormData
+): Promise<{ fejl?: string; ok?: boolean; testBesked?: string }> {
+  const resultat = await kraevEjer();
+  if ("fejl" in resultat) return { fejl: resultat.fejl };
+  const { supabase, brugerId } = resultat;
+
+  const brugernavn = String(formData.get("brugernavn") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  if (!brugernavn || !password) {
+    return { fejl: "Udfyld både brugernavn og password." };
+  }
+
+  const test = await testCvrForbindelse(brugernavn, password);
+
+  const { error } = await supabase
+    .from("cvr_forbindelse")
+    .update({
+      brugernavn,
+      password,
+      forbundet_af: brugerId,
+      forbundet_tidspunkt: new Date().toISOString(),
+      sidst_testet: new Date().toISOString(),
+      sidst_test_ok: test.ok,
+      sidst_test_besked: test.besked,
+    })
+    .eq("id", true);
+
+  if (error) return { fejl: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, testBesked: test.besked };
+}
+
+// Kører en frisk test mod de allerede gemte credentials - bruges af
+// "Test forbindelse"-knappen uden at brugeren skal skrive password igen.
+export async function afproevCvrForbindelse(): Promise<{ fejl?: string; besked?: string; ok?: boolean }> {
+  const resultat = await kraevEjer();
+  if ("fejl" in resultat) return { fejl: resultat.fejl };
+  const { supabase } = resultat;
+
+  const { data: forbindelse } = await supabase
+    .from("cvr_forbindelse")
+    .select("brugernavn, password")
+    .eq("id", true)
+    .single();
+
+  if (!forbindelse?.brugernavn || !forbindelse.password) {
+    return { fejl: "Ingen CVR-forbindelse er gemt endnu." };
+  }
+
+  const test = await testCvrForbindelse(forbindelse.brugernavn, forbindelse.password);
+
+  await supabase
+    .from("cvr_forbindelse")
+    .update({
+      sidst_testet: new Date().toISOString(),
+      sidst_test_ok: test.ok,
+      sidst_test_besked: test.besked,
+    })
+    .eq("id", true);
+
+  revalidatePath("/", "layout");
+  return { ok: test.ok, besked: test.besked };
+}
+
+export async function fjernCvrForbindelse(): Promise<{ fejl?: string; ok?: boolean }> {
+  const resultat = await kraevEjer();
+  if ("fejl" in resultat) return { fejl: resultat.fejl };
+  const { supabase } = resultat;
+
+  const { error } = await supabase
+    .from("cvr_forbindelse")
+    .update({
+      brugernavn: null,
+      password: null,
+      forbundet_af: null,
+      forbundet_tidspunkt: null,
+      sidst_testet: null,
+      sidst_test_ok: null,
+      sidst_test_besked: null,
+    })
+    .eq("id", true);
+
+  if (error) return { fejl: error.message };
+
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

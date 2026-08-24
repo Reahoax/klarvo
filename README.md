@@ -31,6 +31,20 @@ men spørg ikke om lov til selve `git push` eller `vercel deploy --prod`.
 Vercel er endnu ikke koblet til GitHub-reposet (auto-deploy ved push) — kun
 foreslået, ikke bekræftet.
 
+**Sidste session (2026-08-24):** Etape 10 (Møder og saldo — bookingflow, kvalitetstjek,
+mødestatus) og en ny CVR-forbindelse (Indstillinger → Integrationer, ejer-only) blev
+bygget. Brugeren har fået sin system-til-system-adgang fra Erhvervsstyrelsen og testede
+den live sammen med mig — se "CVR system-til-system-adgang" nedenfor for de bekræftede
+tekniske detaljer (endpoint, alias-struktur, auth). **Vigtigt hændelsesforløb:** brugeren
+limede sit rigtige CVR-brugernavn/password ind i chatten to gange under fejlfinding af
+curl-kommandoer. Jeg brugte det ikke til noget (kørte ingen kald med det selv), bad om at
+det blev skiftet, og nægtede at genbruge det gamle password i eksempler, selv efter direkte
+bedt om det. Konsekvensen blev en ny, sikker "Integrationer"-fane, hvor login gemmes i en
+egen database-tabel (`cvr_forbindelse`) med RLS strammere end appens sædvanlige mønster —
+se afsnittet nedenfor for hvorfor. **Vær opmærksom fremover:** hvis brugeren igen limer
+rigtige credentials/secrets direkte ind i chatten, følg samme linje — brug dem ikke, bed om
+rotation, og pointér tilbage til at teste i deres egen terminal eller via UI'et.
+
 **Sidste session (2026-08-14):** Ikoner tilføjet i hele appen (sidebar, Indstillinger,
 brugermenu, sideoverskrifter, stat-kort) via `lucide-react` (nyt, eneste tilføjede
 afhængighed denne gang — se "Teknisk stack"). Samtidig fik alle store informationskort
@@ -92,11 +106,12 @@ virksomhedens egne omkostninger. Etape 7B (Snapshots) og resten af Etape 6
 Projektet fik sit første git-repo (se "Git" ovenfor). Se "Udover Spec.md" og
 "Mappestruktur" nedenfor for detaljer.
 
-**To ting afventer stadig brugeren** (spørg ikke om dem igen, bare tjek om de er løst):
+**Én ting afventer stadig brugeren** (spørg ikke om det igen, bare tjek om det er løst):
 1. `ANTHROPIC_API_KEY` til AI-berigelse (Etape 5). Aftalt tilgang: AI må kun *foreslå*
    svar til kvalificeringsfelterne — mennesket skal stadig klikke Ja/Nej selv (R6).
-2. CVR system-til-system-brugeroplysninger fra Erhvervsstyrelsen (Etape 11). Ansøgt,
-   afventer godkendelse (~3 ugers behandlingstid dengang den blev sendt).
+
+CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbundet
+2026-08-24 — se "CVR system-til-system-adgang" nedenfor.
 
 **Etablerede mønstre — følg dem, medmindre brugeren beder om andet:**
 - Hurtige handlinger (opret/rediger noget lille) bygges som pop-op'er
@@ -159,7 +174,7 @@ Projektet fik sit første git-repo (se "Git" ovenfor). Se "Udover Spec.md" og
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
-| 11 — CVR API-integration | Ikke bygget — afventer brugeroplysninger fra Erhvervsstyrelsens system-til-system-adgang |
+| 11 — CVR API-integration | Delvist (2026-08-24): forbindelsen (Indstillinger → Integrationer, ejer-only) er bygget og testet live mod det rigtige Erhvervsstyrelse-endpoint — se "CVR system-til-system-adgang" nedenfor. Selve datatrækket (søgning, filtrering, lagring i Supabase) er IKKE bygget endnu — det er næste skridt |
 | 8, 9, 12 | Ikke bygget endnu |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
@@ -310,6 +325,51 @@ brugerdefineret tema) og `profil-billeder` (avatarer, 5 MB-grænse). Begge har:
   Konto-uploads, indtil det blev opdaget og rettet 2026-08-13. Ingen SELECT
   for `anon` — kun autentificerede kan liste filnavne, offentlig læsning sker
   udelukkende via `/storage/v1/object/public/...`, som ikke er RLS-styret.
+
+## CVR system-til-system-adgang
+
+Etape 11's datakilde. Erhvervsstyrelsens Elasticsearch-baserede løsning — login
+(brugernavn/password, ikke en API-nøgle) fås ved at skrive til
+`cvrselvbetjening@erst.dk`. Følgende er **bekræftet ved et rigtigt, levende kald**
+2026-08-24 (ikke kun læst i dokumentation):
+
+- **Base-URL:** `http://distribution.virk.dk/cvr-permanent` — kun HTTP bekræftet
+  virker, HTTPS er ikke afprøvet. Auth er HTTP Basic (brugernavn:password).
+- **`cvr-permanent` er et alias**, ikke ét indeks — det peger på fire underliggende
+  indeks, adskilt efter hvilket top-level felt et dokument har:
+  - `Vrvirksomhed.*` — virksomheder
+  - `VrproduktionsEnhed.*` — produktionsenheder (bl.a. `antalAnsatte` findes her,
+    ikke på virksomheden selv)
+  - `Vrdeltagerperson.*` — deltagere/personkreds
+  - Et fjerde metadata-indeks (kun tidsstempler)
+- **Der findes ikke separate URL'er som `/virksomhed/_search`** — det gav 404 fra
+  nginx-proxyen foran Elasticsearch, som tilsyneladende kun ruter `/cvr-permanent/...`.
+  Søg mod `cvr-permanent/_search` og filtrér på `Vrvirksomhed.*`-felter i `query`
+  eller `_source` — kun virksomheds-dokumenter har de felter, så det virker som et
+  filter i praksis.
+- **`max_result_window: 3000` bekræftet** — brug Elasticsearch Scroll API for større
+  uddrag end det.
+- Nested felter (`navne`, `hovedbranche`, `beliggenhedsadresse`, `virksomhedsstatus`
+  m.fl.) har `include_in_parent: true` i mappingen, så almindelige flade
+  `term`/`match`-forespørgsler på fx `Vrvirksomhed.hovedbranche.branchekode` virker
+  uden en fuld `nested`-query-indpakning.
+- ES-version er 6.x-serien (ikke 1.7.4, som en uofficiel tredjepartskilde påstod).
+
+**Hvor login gemmes:** tabellen `cvr_forbindelse` (singleton-række, `id boolean
+primary key default true`), skrives/læses via Indstillinger → Integrationer
+(kun `ejer`). RLS er bevidst strammere end appens sædvanlige "permissive true +
+app-lags rollecheck"-mønster (se fx `konfiguration`) — her håndhæves ejer-rollen i
+selve RLS-policyen (`exists (select 1 from profiler where id = auth.uid() and
+rolle = 'ejer')`), fordi rækken indeholder et rigtigt tredjeparts-login, ikke bare
+forretningsregler. Password'et ekkoes aldrig tilbage til klienten: `layout.tsx`
+henter bevidst kun `brugernavn, forbundet_tidspunkt, sidst_testet, sidst_test_ok,
+sidst_test_besked` fra tabellen, aldrig `password`-kolonnen, uanset at RLS ville
+tillade ejer at læse den. `lib/cvr/klient.ts` har selve HTTP-kaldet (bruges af
+"Test forbindelse"-knappen); genbrug den, når det rigtige datatræk bygges.
+
+**Næste skridt (ikke bygget):** selve søgning/filtrering/lagring af CVR-data i
+Supabase (Fase 2-3 i brugerens oprindelige plan). Se "Efterspurgt, endnu ikke
+bygget" og brugerens fase-inddeling, hvis den findes i chatten, for rækkefølgen.
 
 ## Teknisk stack
 

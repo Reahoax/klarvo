@@ -31,6 +31,18 @@ export default async function PanelLayout({
         .single()
     : { data: null };
 
+  // Henter bevidst ALDRIG "password"-kolonnen her, selvom RLS ville tillade
+  // det for ejer-rollen - status-visningen i Indstillinger skal aldrig kunne
+  // vise password'et igen, og det skal ikke engang passere gennem serverens
+  // React-træ eller Next.js' RSC-payload.
+  const { data: cvrForbindelse } = erEjer
+    ? await supabase
+        .from("cvr_forbindelse")
+        .select("brugernavn, forbundet_tidspunkt, sidst_testet, sidst_test_ok, sidst_test_besked")
+        .eq("id", true)
+        .single()
+    : { data: null };
+
   const forbogstav = (profil?.navn || user?.email || "?").slice(0, 1).toUpperCase();
 
   return (
@@ -56,6 +68,7 @@ export default async function PanelLayout({
           navn={profil?.navn ?? null}
           avatarUrl={profil?.avatar_url ?? null}
           konfiguration={konfiguration}
+          cvrForbindelse={cvrForbindelse}
           forbogstav={forbogstav}
           logUd={logUd}
         />
