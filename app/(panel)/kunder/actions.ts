@@ -59,10 +59,11 @@ export async function opdaterKunde(formData: FormData) {
   revalidatePath("/kunder");
 }
 
-export async function opdaterIcp(formData: FormData) {
-  const kundeId = String(formData.get("kundeId") ?? "");
-  if (!kundeId) return;
-
+// Delt af både kundens ICP-felt og hvert segments egne kriterier - samme
+// firkantede kriterie-form bruges begge steder (se Spec.md "Hver kunde har
+// en ICP-definition... Hvert segment er en navngiven ICP med sine egne
+// kriterier").
+function parseKriterier(formData: FormData) {
   const splitListe = (vaerdi: FormDataEntryValue | null) =>
     String(vaerdi ?? "")
       .split(",")
@@ -72,16 +73,21 @@ export async function opdaterIcp(formData: FormData) {
   const ansatteFraRaa = String(formData.get("ansatte_fra") ?? "").trim();
   const ansatteTilRaa = String(formData.get("ansatte_til") ?? "").trim();
 
-  const icp = {
+  return {
     branchekoder: splitListe(formData.get("branchekoder")),
     virksomhedsformer: splitListe(formData.get("virksomhedsformer")),
     postnumre: splitListe(formData.get("postnumre")),
     ansatte_fra: ansatteFraRaa ? Number(ansatteFraRaa) : null,
     ansatte_til: ansatteTilRaa ? Number(ansatteTilRaa) : null,
   };
+}
+
+export async function opdaterIcp(formData: FormData) {
+  const kundeId = String(formData.get("kundeId") ?? "");
+  if (!kundeId) return;
 
   const supabase = await opretServerKlient();
-  await supabase.from("kunder").update({ icp }).eq("id", kundeId);
+  await supabase.from("kunder").update({ icp: parseKriterier(formData) }).eq("id", kundeId);
 
   revalidatePath(`/kunder/${kundeId}`);
 }
@@ -161,4 +167,50 @@ export async function skiftAktivStatus(formData: FormData) {
 
   revalidatePath(`/kunder/${kundeId}`);
   revalidatePath("/kunder");
+}
+
+// Etape 7C — Segmenter (Spec.md "I. ICP-analyse og segmenter"): en kunde kan
+// have flere navngivne ICP'er ad gangen, hver med sin egen leadliste, så
+// flere hypoteser kan testes parallelt og sammenlignes (se
+// lib/segmenter/statistik.ts for kontaktrate/mødrate pr. segment).
+export async function opretSegment(formData: FormData) {
+  const kundeId = String(formData.get("kundeId") ?? "");
+  const navn = String(formData.get("navn") ?? "").trim();
+  if (!kundeId || !navn) return;
+
+  const supabase = await opretServerKlient();
+  await supabase.from("segmenter").insert({
+    kunde_id: kundeId,
+    navn,
+    kriterier: parseKriterier(formData),
+  });
+
+  revalidatePath(`/kunder/${kundeId}`);
+}
+
+export async function opdaterSegment(formData: FormData) {
+  const segmentId = String(formData.get("segmentId") ?? "");
+  const kundeId = String(formData.get("kundeId") ?? "");
+  const navn = String(formData.get("navn") ?? "").trim();
+  if (!segmentId || !kundeId || !navn) return;
+
+  const supabase = await opretServerKlient();
+  await supabase
+    .from("segmenter")
+    .update({ navn, kriterier: parseKriterier(formData) })
+    .eq("id", segmentId);
+
+  revalidatePath(`/kunder/${kundeId}`);
+}
+
+export async function skiftSegmentAktiv(formData: FormData) {
+  const segmentId = String(formData.get("segmentId") ?? "");
+  const kundeId = String(formData.get("kundeId") ?? "");
+  const nyStatus = formData.get("aktiv") === "true";
+  if (!segmentId || !kundeId) return;
+
+  const supabase = await opretServerKlient();
+  await supabase.from("segmenter").update({ aktiv: nyStatus }).eq("id", segmentId);
+
+  revalidatePath(`/kunder/${kundeId}`);
 }

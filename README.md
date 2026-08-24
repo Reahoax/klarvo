@@ -60,6 +60,25 @@ API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
 bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
 "Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
+**Sidste session, del 3 (2026-08-24):** Etape 7C — Segmenter (den forreste halvdel
+af Spec.md "I. ICP-analyse og segmenter"). Brugeren bad om at komme i gang med
+"ICP osv." og valgte eksplicit segmenter først, ikke den bagudrettede ICP-analyse
+(upload af bedste-kunder-liste → CVR-opslag). `segmenter`- og `lead_segmenter`-
+tabellerne (inkl. RLS) fandtes allerede fra tidligere sessioner (ubrugte, 0 rækker)
+— kun UI og server actions manglede. Bygget: navngivne ICP'er pr. kunde med egen
+statistik (`lib/segmenter/statistik.ts`, testet), CRUD på kundedetaljer, og manuel
+tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment") —
+den menneskestyrede vej ind, indtil automatisk foreslået matching (Etape 9) bygges.
+**Rettelse fundet under browsertest:** `TildelKundeForm` (klientkomponent) brugte
+`useState(initialKundeId)` til at style en `<select>`; efter et vellykket Gem
+kørte Next.js en server-refresh, men React genbrugte samme komponent-instans og
+beholdt den GAMLE lokale tilstand, så feltet visuelt sprang tilbage til "Ingen
+(ukoblet)" selvom data var gemt korrekt (bekræftet ved en hård sideindlæsning).
+Løst med `key={\`${lead.kunde_id}:${segmentIds.join(",")}\`}` på komponenten, så
+React tvinges til at genmontere den, når de underliggende data reelt ændres — brug
+samme mønster for lignende "gem via server action, vis frisk lokal starttilstand"-
+komponenter fremover.
+
 **Sidste session, del 2 (2026-08-24):** Manuel CSV-import er fjernet helt,
 efter brugeren bekræftede at den automatiske CVR-import kørte stabilt
 ("Fjern CSV import, og kan den ikke få alle Leads ind?"). `leads/importer/`
@@ -228,7 +247,9 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
 | 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
-| 8, 9, 12 | Ikke bygget endnu |
+| 7C — ICP-analyse og segmenter | Delvist bygget (2026-08-24): **segmenter** er på plads — navngivne ICP'er pr. kunde (`segmenter`-tabellen, samme kriterie-form som `kunder.icp`), med statistik pr. segment (leads tilknyttet, ringet, kontaktrate, mødrate - se `lib/segmenter/statistik.ts`) og manuel tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment"). **ICP-analysen** (bagudrettet: upload liste over bedste kunder → CVR-opslag → statistisk udkast til ICP) er ikke bygget - brugeren valgte eksplicit at starte med segmenter først |
+| 8, 12 | Ikke bygget endnu |
+| 9 — Matching | Ikke bygget (automatisk foreslået score/begrundelse) - manuel tildeling til kunde/segment findes allerede, se Etape 7C |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
 **Udover Spec.md:**
@@ -570,8 +591,13 @@ Ordino/
                                   Tabel/Kanban-visning
         [id]/
           page.tsx                 Detaljevisning: alle felter + activity_log-historik +
-                                    Snapshot-historik (Etape 7B, diffet mod forrige import)
-          actions.ts                Server actions: skift pipeline-stadie, godkend lead
+                                    Snapshot-historik (Etape 7B, diffet mod forrige import) +
+                                    "Kunde og segment" (Etape 7C, manuel tildeling)
+          actions.ts                Server actions: skift pipeline-stadie, godkend lead,
+                                    tildelKunde (kunde_id + lead_segmenter, Etape 7C)
+          tildel-kunde-form.tsx     Klientkomponent: filtrerer segment-checkbokse til den
+                                    valgte kundes egne (se README "Etablerede mønstre" om
+                                    key-mønsteret, der forhindrer stale visning efter Gem)
         importer/
           page.tsx                 Ren statusside for den automatiske CVR-import
                                     (kun ejer) - ingen upload, ingen knap; se
@@ -590,10 +616,12 @@ Ordino/
         page.tsx                 Skærmbillede E: kundeliste, saldo, DPA-status
         ny-kunde-modal.tsx        Pop-op til oprettelse
         actions.ts                Server actions: opret/opdater kunde, ICP, DPA, saldo,
-                                  opretManuskript (ny version, aldrig UPDATE)
+                                  opretManuskript (ny version, aldrig UPDATE), segment-CRUD
+                                  (opretSegment/opdaterSegment/skiftSegmentAktiv, Etape 7C)
         [id]/
-          page.tsx                 Stamdata, saldo, DPA, ICP, opkaldsmanuskript
-                                  (nuværende + historik), tilknyttede leads
+          page.tsx                 Stamdata, saldo, DPA, ICP, segmenter (Etape 7C, med
+                                  statistik), opkaldsmanuskript (nuværende + historik),
+                                  tilknyttede leads
       soegninger/
         page.tsx                 Liste over gemte søgninger (ikke i venstremenuen)
   lib/
@@ -611,6 +639,10 @@ Ordino/
                                     uafhængigt af serverens tidszone) + tests
       indvendinger.ts               Etape 6: fast liste over indvendinger, og hvilke
                                     opkaldsudfald der overhovedet spørger om én
+    segmenter/
+      statistik.ts                  Etape 7C: antal leads/ringet/kontaktrate/mødrate
+                                    pr. segment, ud fra lead_segmenter + aktiviteter +
+                                    moeder - ren funktion + tests
     supabase/
       client.ts                  Supabase-klient til browseren
       server.ts                  Supabase-klient til server components/actions

@@ -60,3 +60,33 @@ export async function godkendLead(formData: FormData) {
   revalidatePath("/leads");
   revalidatePath("/ringeliste");
 }
+
+// Etape 7C — manuel tildeling af et lead til en kunde og (valgfrit) et eller
+// flere af den kundes segmenter. Automatisk foreslået matching med score
+// (Spec.md "G. Matching") er Etape 9, ikke bygget - dette er den menneske-
+// styrede vej ind, indtil da. "Et lead kan tilhøre flere segmenter, men skal
+// aldrig tildeles to kunder samtidig" (Spec.md "I") - håndhæves naturligt her,
+// da leads.kunde_id er én enkelt fremmednøgle, ikke en liste.
+export async function tildelKunde(formData: FormData) {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return;
+
+  const kundeId = String(formData.get("kundeId") ?? "").trim() || null;
+  const segmentIds = formData.getAll("segmentIds").map(String).filter(Boolean);
+
+  const supabase = await opretServerKlient();
+
+  await supabase.from("leads").update({ kunde_id: kundeId }).eq("id", leadId);
+
+  await supabase.from("lead_segmenter").delete().eq("lead_id", leadId);
+  if (kundeId && segmentIds.length > 0) {
+    await supabase
+      .from("lead_segmenter")
+      .insert(segmentIds.map((segmentId) => ({ lead_id: leadId, segment_id: segmentId })));
+  }
+
+  revalidatePath(`/leads/${leadId}`);
+  revalidatePath("/leads");
+  revalidatePath("/kunder");
+  if (kundeId) revalidatePath(`/kunder/${kundeId}`);
+}

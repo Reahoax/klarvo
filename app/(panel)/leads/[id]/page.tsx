@@ -9,11 +9,13 @@ import {
   History,
   Camera,
   Calculator,
+  Handshake,
 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 import { beregnSnapshotDiff, SNAPSHOT_FELT_LABEL, type SnapshotData } from "@/lib/leads/snapshots.ts";
 import { godkendLead, opdaterPipelineStatus } from "./actions";
+import { TildelKundeForm } from "./tildel-kunde-form";
 
 type Lead = {
   id: string;
@@ -46,6 +48,14 @@ type Lead = {
   kilde: string;
   oprettet: string;
   sidst_aendret: string;
+  kunde_id: string | null;
+};
+
+type KundeMedSegmenter = {
+  id: string;
+  navn: string;
+  aktive: boolean;
+  segmenter: { id: string; navn: string; aktiv: boolean }[];
 };
 
 type LogRaekke = {
@@ -129,6 +139,15 @@ export default async function LeadDetaljeSide({
     .eq("lead_id", id)
     .order("hentet", { ascending: true })
     .returns<SnapshotRaekke[]>();
+
+  const [{ data: kunder }, { data: tildelteSegmenter }] = await Promise.all([
+    supabase
+      .from("kunder")
+      .select("id, navn, aktive, segmenter(id, navn, aktiv)")
+      .order("navn")
+      .returns<KundeMedSegmenter[]>(),
+    supabase.from("lead_segmenter").select("segment_id").eq("lead_id", id),
+  ]);
 
   // Diffs beregnes mellem hvert snapshot og det forrige - kun det, en
   // geninport fandt ændret "derude", vises. Nyeste øverst i visningen.
@@ -362,6 +381,30 @@ export default async function LeadDetaljeSide({
           </div>
 
           <div className="flex flex-col gap-3">
+            <section>
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <Handshake className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Kunde og segment
+              </h2>
+              <div className="kort-hover rounded-lg border border-kant bg-flade p-4">
+                {/* key tvinger et nyt mount, når kunde eller segmenter ændres af
+                    Gem-knappen nedenfor - ellers beholder React sin lokale
+                    useState fra før serverhandlingen, og feltet klapper visuelt
+                    tilbage til den gamle værdi efter gem, selvom data er gemt
+                    korrekt (kun synligt ved næste rigtige sideindlæsning). */}
+                <TildelKundeForm
+                  key={`${lead.kunde_id ?? "ukoblet"}:${(tildelteSegmenter ?? [])
+                    .map((t) => t.segment_id)
+                    .sort()
+                    .join(",")}`}
+                  leadId={lead.id}
+                  kunder={kunder ?? []}
+                  initialKundeId={lead.kunde_id}
+                  initialSegmentIds={(tildelteSegmenter ?? []).map((t) => t.segment_id)}
+                />
+              </div>
+            </section>
+
             <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tekst">
               <Calculator className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
               Beregnede felter
