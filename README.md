@@ -60,6 +60,22 @@ API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
 bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
 "Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
+**Sidste session, del 2 (2026-08-24):** Manuel CSV-import er fjernet helt,
+efter brugeren bekræftede at den automatiske CVR-import kørte stabilt
+("Fjern CSV import, og kan den ikke få alle Leads ind?"). `leads/importer/`
+er nu en ren statusside (ingen upload, ingen knap) — se "Hvor data kommer
+fra" og "Automatisk CVR-import" nedenfor, begge omskrevet til at afspejle
+dette. Samtidig blev import-logikken lavet om fra "hent 200 virksomheder pr.
+nat" til at **gennemløbe hele det filtrerede CVR-datasæt** over flere
+kørsler: ny tabel `cvr_import_fremgang` husker, hvor forrige nats kørsel
+slap (`sidste_cvr_nummer`), og `lib/cvr/sog.ts` bruger Elasticsearchs
+`search_after`-pagination (batch-størrelse 3000, ES'ens `max_result_window`-
+loft) i stedet for et fast antal. Når en batch giver 0 resultater, er hele
+registret gennemløbet — cursoren nulstilles, og næste kørsel starter forfra
+(for løbende at fange nye/ændrede virksomheder). `papaparse` er afinstalleret
+(var kun brugt af CSV-importen). Byg ikke CSV-import eller en fast
+batch-grænse tilbage uden at spørge — se "Etablerede mønstre".
+
 **Sidste session (2026-08-14):** Ikoner tilføjet i hele appen (sidebar, Indstillinger,
 brugermenu, sideoverskrifter, stat-kort) via `lucide-react` (nyt, eneste tilføjede
 afhængighed denne gang — se "Teknisk stack"). Samtidig fik alle store informationskort
@@ -141,11 +157,16 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 2026-08-24 — se "CVR system-til-system-adgang" nedenfor.
 
 **Etablerede mønstre — følg dem, medmindre brugeren beder om andet:**
-- **CVR-import er automatisk (cron), ikke en knap brugeren klikker.** Bygget
-  først som en manuel "Hent fra CVR"-knap, som brugeren eksplicit afviste:
-  "Man skal ikke selv hente den. De skal bare være der lige fra start af."
-  Knappen/actionen blev fjernet igen samme session. Byg den ikke tilbage uden
-  at spørge — se "Automatisk CVR-import" for hvordan det er løst i stedet.
+- **CVR-import er automatisk (cron), ikke en knap brugeren klikker, og der er
+  ingen manuel import-vej ind i det hele taget.** Bygget først som en manuel
+  "Hent fra CVR"-knap, som brugeren eksplicit afviste: "Man skal ikke selv
+  hente den. De skal bare være der lige fra start af." Knappen/actionen blev
+  fjernet igen samme session. Den oprindelige CSV-import (Etape 2) er også
+  fjernet helt (2026-08-24, brugerens eget ønske: "Fjern CSV import") —
+  `lib/leads/import.ts`, importer-formularen og alle tilhørende actions
+  findes ikke længere. Byg hverken en manuel CVR-knap eller CSV-upload
+  tilbage uden at spørge — se "Automatisk CVR-import" for hvordan det er
+  løst i stedet.
 - Hurtige handlinger (opret/rediger noget lille) bygges som pop-op'er
   (`fixed inset-0` + backdrop), ikke som nye sider — se `kunder/ny-kunde-modal.tsx`
   eller `indstillinger-modal.tsx`. Kun indhold, der reelt kræver en hel side
@@ -199,14 +220,14 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | Etape | Status |
 |---|---|
 | 1 — Fundament | Bygget: database, login, leadtabel |
-| 2 — Import | Bygget: CSV-import, R1/R3/R4, dublet-håndtering, telefonnormalisering |
+| 2 — Import | Bygget: R1/R3/R4, dublet-håndtering, telefonnormalisering. Import sker nu udelukkende via Etape 11's automatiske CVR-import — den oprindelige CSV-import er fjernet (2026-08-24) |
 | 3 — Leadvisning og filtre | Bygget: filtrering, sortering, søgning, detaljevisning + historik. Branche-/geografifiltre (DB07-træ) mangler — kræver referencedata vi ikke har |
 | 4 — Kvalificeringskø | Bygget: ét lead ad gangen, tastaturgenveje (1-8, "?" for oversigt) |
 | 6 — Godkendelse og ringeliste | Bygget (2026-08-13): godkendelse, ringeliste, 5 udfald, genringning (maks. 4 forsøg), ringetidsvindue (default hverdage 9-16, `lib/leads/ringetid.ts`, redigeres i Indstillinger → Forretningsregler), indvendingslog (fast liste, `lib/leads/indvendinger.ts`, kun ved "Lagde på"/"Ikke interesseret"), opkaldsmanuskripter pr. kunde med versionering (`manuskripter`-tabel, redigeres på kundedetaljer, vist i ringelisten, version logges på hvert opkald). Manuskripter pr. *segment* har kun fået sin databasekolonne (`segment_id`) — ingen UI endnu, da leads ikke tildeles segmenter automatisk (Etape 9). "Møde booket" er stadig kun deaktiveret indtil et lead kan tildeles en kunde (Matching, Etape 9) |
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
-| 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. CSV-import er stadig aktiv sideløbende — fjernes først når cron har kørt stabilt et par dage, se "Etablerede mønstre" |
+| 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
 | 8, 9, 12 | Ikke bygget endnu |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
@@ -288,15 +309,24 @@ specen betyder, at de to konti oprettes manuelt:
 
 ## Hvor data kommer fra
 
-CVR-data hentes fra en CSV-udtræksfil fra cvr.dk, uploadet via Leads → Importér
-leads. **Ingen scraping af Virk** — det er en hård regel (R1), håndhævet ved at
-der ikke findes nogen kode i dette projekt, der henter data fra datacvr.virk.dk.
+CVR-data hentes automatisk hver nat direkte fra Erhvervsstyrelsens
+system-til-system-adgang (se "CVR system-til-system-adgang" og "Automatisk
+CVR-import" nedenfor) — ingen manuel import findes. **Ingen scraping af
+Virk** — det er en hård regel (R1), håndhævet ved at der ikke findes nogen
+kode i dette projekt, der henter data fra datacvr.virk.dk (adgangen går mod
+Erhvervsstyrelsens officielle `distribution.virk.dk`-endpoint, ikke
+webscraping af selve virk.dk-siden).
 
-Forventede kolonner i CSV-filen (aliaser accepteret, se `lib/leads/import.ts`):
-`cvr_nummer`, `virksomhedsnavn`, `virksomhedsform`, `branchekode`, `branchetekst`,
-`antal_ansatte`, `status`, `adresse`, `postnr`, `by`, `telefon`, `website`,
-`reklamebeskyttelse`. Disse er gættet ud fra datamodellen i Spec.md, ikke fra en
-rigtig udtræksfil — udvid aliaslisten, når I har set en ægte fil fra cvr.dk.
+**Historik:** Frem til 2026-08-24 kunne leads også importeres manuelt via en
+CSV-udtræksfil fra cvr.dk (`Leads → Importér leads`). Den vej er fjernet helt
+på brugerens eksplicitte ønske ("Fjern CSV import") efter at den automatiske
+CVR-import var bekræftet stabil — `lib/leads/import.ts` og hele
+`leads/importer/`-formularen findes ikke længere. Feltmappingen fra dengang
+(`cvr_nummer`, `virksomhedsnavn`, `virksomhedsform`, `branchekode`,
+`branchetekst`, `antal_ansatte`, `status`, `adresse`, `postnr`, `by`,
+`telefon`, `website`, `reklamebeskyttelse`) lever videre i `leads`-tabellens
+skema og bruges stadig af CVR-importen, blot udfyldt fra API-svaret i stedet
+for en CSV-fil — se `lib/cvr/mapning.ts`.
 
 ## Hvad de hårde regler betyder i praksis
 
@@ -442,8 +472,27 @@ Cron**-job, ikke en handling en bruger udløser:
   snapshot), delt mellem cron-routen og (hvis den bygges senere) en eventuel manuel
   udløser. Tager en allerede-autoriseret Supabase-klient som parameter i stedet for
   selv at tjekke session/rolle.
-- Status for seneste automatiske kørsel vises på `/leads/importer` (kun `ejer`),
-  hentet fra nyeste `soegninger`-række med `parametre->>kilde = 'cvr_api'`.
+- Status for seneste automatiske kørsel vises på `/leads/importer` (kun `ejer`,
+  ren statusside uden knapper — se "Historik" ovenfor for hvorfor), hentet fra
+  nyeste `soegninger`-række med `parametre->>kilde = 'cvr_api'`.
+
+**Gennemløber hele det filtrerede datasæt, ikke en fast portion (2026-08-24):**
+brugeren bad eksplicit om at importen skal kunne "få alle leads ind", ikke kun
+et fast antal pr. nat. `lib/cvr/sog.ts` bruger derfor Elasticsearchs
+`search_after`-pagination (sorteret på `Vrvirksomhed.cvrNummer`, batch-størrelse
+3000 — ES'ens `max_result_window`-loft) i stedet for Scroll API'et, fordi den er
+statsløs og ikke har en server-side udløbstid, hvilket passer til at en kørsel
+kan genoptages efter et helt døgns pause. Ny tabel **`cvr_import_fremgang`**
+(singleton-række) husker `sidste_cvr_nummer` (cursor) og `samlet_gennemloeb`
+(hvor mange gange hele registret er gennemløbet) mellem kørsler.
+`koerCvrImport` gemmer fremgangen efter **hver** batch (ikke kun ved kørslens
+slutning), så et timeout eller crash midt i en nat ikke mister fremskridt. Når
+en batch giver 0 resultater, er hele det filtrerede registret gennemløbet for
+denne omgang — cursoren nulstilles til `null`, og næste kørsel starter forfra
+(for løbende at fange nye og ændrede virksomheder, ikke kun nye siden sidst).
+Hver kørsel er desuden begrænset til `MAKS_BATCHES_PR_KOERSEL = 20` batches
+(60.000 virksomheder) og et tidsbudget på 50 sekunder, for at blive inden for
+cron-routens `maxDuration = 60`.
 
 **Status: fuldt bekræftet virkende i produktion (2026-08-24).**
 `SUPABASE_SERVICE_ROLE_KEY` er sat (Vercel har udfaset "service_role"-navnet til
@@ -457,12 +506,10 @@ importeret, 134 korrekt spærret (reklamebeskyttet)**. Cron-jobbet kører nu af
 sig selv hver nat kl. 05:00 UTC (07:00 dansk sommertid) uden yderligere
 handling.
 
-**Tilbageværende, ikke-hastende:** fjern CSV-import helt (brugeren har bedt om
-det eksplicit, men først når automatisk import har kørt stabilt et par dage -
-se "Etablerede mønstre"). Overvej også: adgangs-hyppighed (dagligt er
-Hobby-plan-loftet; opgradér hvis oftere ønskes), og om `koerCvrImport`'s
-faste batch-størrelse (200) skal gøres konfigurerbar eller udvides med
-Scroll API for at dække mere af det samlede marked over tid.
+**Tilbageværende, ikke-hastende:** adgangs-hyppighed (dagligt er
+Hobby-plan-loftet; opgradér Vercel-planen hvis hyppigere import ønskes — flere
+kørsler pr. døgn ville også lade hele registret gennemløbes hurtigere end i
+dag).
 
 ## Teknisk stack
 
@@ -526,10 +573,9 @@ Ordino/
                                     Snapshot-historik (Etape 7B, diffet mod forrige import)
           actions.ts                Server actions: skift pipeline-stadie, godkend lead
         importer/
-          page.tsx                 CSV-import
-          actions.ts                Server action der udfører importen + gemmer
-                                    lead_snapshots pr. berørt lead (Etape 7B)
-          importer-form.tsx         Klientkomponent med rapportvisning
+          page.tsx                 Ren statusside for den automatiske CVR-import
+                                    (kun ejer) - ingen upload, ingen knap; se
+                                    "Automatisk CVR-import"
       kvalificering/
         page.tsx                 Skærmbillede C: kvalificeringskø, ét lead ad gangen
         kvalificerings-kort.tsx  Klientkomponent: tastaturgenveje, optimistisk gemning
@@ -556,7 +602,6 @@ Ordino/
     tema.ts                     Delt logik for det brugerdefinerede tema: hex↔rgb,
                                 standardpaletter, gem/hent/anvend/nulstil
     leads/
-      import.ts                  Importfilter (R1/R3/R4, dubletter) + tests
       telefon.ts                  Telefonnormalisering + tests
       filters.ts                  Filterparsing/-anvendelse for leadtabellen
       pipeline.ts                  Delt definition af pipeline-stadier, labels, farver
