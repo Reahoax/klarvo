@@ -1,7 +1,20 @@
-import { Upload, Radar } from "lucide-react";
+import { Radar } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
-import { ImporterForm } from "./importer-form";
 
+type SenesteKoersel = {
+  navn: string;
+  traeffere: number;
+  sidst_koert: string;
+  parametre: { antalBatches?: number; gennemloebFuldfoert?: boolean; fejl?: string | null } | null;
+};
+
+// Etape 11 — CVR-import kører helt automatisk (Vercel Cron, se vercel.json +
+// app/api/cron/cvr-import) og gennemløber selv hele det filtrerede CVR-
+// datasæt over flere nætter (se cvr_import_fremgang + search_after i
+// lib/cvr/sog.ts). Ingen manuel knap - brugeren bad eksplicit om at leads
+// "bare skal være der" uden at nogen selv henter dem, og CSV-import (den
+// oprindelige, manuelle vej ind) er derfor fjernet helt (2026-08-24). Denne
+// side viser bare status - se README "Automatisk CVR-import" for detaljer.
 export default async function ImporterSide() {
   const supabase = await opretServerKlient();
   const {
@@ -10,78 +23,92 @@ export default async function ImporterSide() {
   const { data: profil } = user
     ? await supabase.from("profiler").select("rolle").eq("id", user.id).single()
     : { data: null };
-
-  // Etape 11 — CVR-import kører nu helt automatisk (Vercel Cron, se
-  // vercel.json + app/api/cron/cvr-import) i stedet for en manuel knap her -
-  // brugeren bad eksplicit om at leads "bare skal være der" uden at nogen
-  // selv skal hente dem. Denne sektion viser bare status for seneste kørsel.
-  const { data: senesteCvrImport } = profil?.rolle === "ejer"
-    ? await supabase
-        .from("soegninger")
-        .select("navn, traeffere, sidst_koert")
-        .contains("parametre", { kilde: "cvr_api" })
-        .order("sidst_koert", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
+  const erEjer = profil?.rolle === "ejer";
 
   const { data: konfiguration } = await supabase
     .from("konfiguration")
-    .select("tilladte_virksomhedsformer, virksomhedsformer_fysiske_personer")
+    .select("tilladte_virksomhedsformer")
+    .eq("id", true)
     .single();
 
-  const kraeverRobinsonlisteTjek = (konfiguration?.tilladte_virksomhedsformer ?? []).some(
-    (form: string) =>
-      (konfiguration?.virksomhedsformer_fysiske_personer ?? []).includes(form)
-  );
+  const [{ data: senesteKoersel }, { data: fremgang }] = erEjer
+    ? await Promise.all([
+        supabase
+          .from("soegninger")
+          .select("navn, traeffere, sidst_koert, parametre")
+          .contains("parametre", { kilde: "cvr_api" })
+          .order("sidst_koert", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .returns<SenesteKoersel>(),
+        supabase
+          .from("cvr_import_fremgang")
+          .select("samlet_gennemloeb, sidste_cvr_nummer")
+          .eq("id", true)
+          .single(),
+      ])
+    : [{ data: null }, { data: null }];
 
   return (
     <div className="max-w-2xl p-6">
       <h1 className="flex items-center gap-2 text-lg font-semibold text-tekst">
-        <Upload className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
-        Importér leads
+        <Radar className="h-5 w-5 text-tekst-daempet" strokeWidth={1.75} />
+        Leads fra CVR
       </h1>
       <p className="mb-6 text-sm text-tekst-daempet">
-        Upload en CSV-udtræksfil fra cvr.dk. Importen er bred inden for filen - hvilke leads I
-        faktisk arbejder videre med, vælges bagefter i leadtabellen.
+        Leads hentes automatisk hver nat direkte fra Erhvervsstyrelsens CVR-adgang — ingen skal
+        importere noget manuelt. Filtreret til jeres tilladte virksomhedsformer og aktive
+        virksomheder.
       </p>
 
-      <p className="mb-6 text-xs text-tekst-daempet">
-        Tilladte virksomhedsformer lige nu:{" "}
-        {(konfiguration?.tilladte_virksomhedsformer ?? []).join(", ") || "ingen sat"}. Ændres i
-        databasens <code>konfiguration</code>-tabel.
-      </p>
-
-      {kraeverRobinsonlisteTjek && (
-        <p className="mb-6 rounded border border-advarsel/40 bg-advarsel-baggrund px-4 py-3 text-sm text-advarsel">
-          Den tilladte liste over virksomhedsformer indeholder former, der dækker fysiske
-          personer. Robinsonliste-tjek er påkrævet, før der ringes til disse leads.
+      {!erEjer && (
+        <p className="rounded-lg border border-kant bg-flade px-4 py-6 text-center text-sm text-tekst-daempet">
+          Status for den automatiske import er kun synlig for ejere.
         </p>
       )}
 
-      {profil?.rolle === "ejer" && (
-        <div className="mb-6 flex flex-col gap-2 rounded border border-kant bg-flade p-4">
-          <div className="flex items-center gap-2">
-            <Radar className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
-            <h2 className="text-sm font-semibold text-tekst">Automatisk CVR-import</h2>
-          </div>
+      {erEjer && (
+        <div className="flex flex-col gap-4 rounded-lg border border-kant bg-flade p-4">
           <p className="text-xs text-tekst-daempet">
-            Henter selv hver nat fra Erhvervsstyrelsens CVR-adgang (Indstillinger →
-            Integrationer), filtreret til jeres tilladte virksomhedsformer og aktive
-            virksomheder. Ingen manuel handling nødvendig.
+            Tilladte virksomhedsformer lige nu:{" "}
+            {(konfiguration?.tilladte_virksomhedsformer ?? []).join(", ") || "ingen sat"}. Ændres
+            i Indstillinger → Forretningsregler.
           </p>
-          {senesteCvrImport ? (
-            <p className="tal text-xs text-tekst-daempet">
-              Seneste kørsel: {new Date(senesteCvrImport.sidst_koert).toLocaleString("da-DK")} —{" "}
-              {senesteCvrImport.traeffere} virksomheder
-            </p>
+
+          {senesteKoersel ? (
+            <div className="flex flex-col gap-1 border-t border-kant pt-3 text-sm">
+              <p className="tal text-tekst">
+                Seneste kørsel: {new Date(senesteKoersel.sidst_koert).toLocaleString("da-DK")}
+              </p>
+              <p className="tal text-tekst-daempet">{senesteKoersel.traeffere} virksomheder importeret</p>
+              {senesteKoersel.parametre?.fejl && (
+                <p className="text-spaerret">Fejl i seneste kørsel: {senesteKoersel.parametre.fejl}</p>
+              )}
+            </div>
           ) : (
-            <p className="text-xs text-tekst-daempet">Har endnu ikke kørt.</p>
+            <p className="border-t border-kant pt-3 text-sm text-tekst-daempet">
+              Har endnu ikke kørt.
+            </p>
+          )}
+
+          {fremgang && (
+            <div className="border-t border-kant pt-3 text-xs text-tekst-daempet">
+              {fremgang.samlet_gennemloeb > 0 ? (
+                <p className="tal">
+                  Har gennemløbet hele det filtrerede CVR-register {fremgang.samlet_gennemloeb}{" "}
+                  gang{fremgang.samlet_gennemloeb === 1 ? "" : "e"} — kører nu videre for at fange
+                  nye og ændrede virksomheder.
+                </p>
+              ) : (
+                <p>
+                  Første gennemløb af hele registret er i gang — fortsætter automatisk hver nat,
+                  til alle virksomheder er nået igennem.
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}
-
-      <ImporterForm />
     </div>
   );
 }

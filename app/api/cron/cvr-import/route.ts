@@ -9,6 +9,13 @@ import { koerCvrImport } from "@/lib/cvr/importer.ts";
 // automatisk Authorization: Bearer $CRON_SECRET på planlagte kald), ikke af
 // en ejer-rolle. Se README "CVR system-til-system-adgang" for de to
 // miljøvariabler, denne route kræver.
+//
+// Gennemløber så meget af det samlede CVR-datasæt, som tidsbudgettet
+// tillader (se lib/cvr/importer.ts), og fortsætter automatisk hvor den
+// forrige nats kørsel slap - brugeren bad eksplicit om at "den skal kunne få
+// alle leads ind", ikke kun en fast portion pr. dag.
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -17,7 +24,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = opretServiceKlient();
-    const rapport = await koerCvrImport(supabase, 200);
+    const rapport = await koerCvrImport(supabase);
 
     if (rapport.fejl) {
       console.error("Automatisk CVR-import fejlede:", rapport.fejl);

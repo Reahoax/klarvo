@@ -340,7 +340,7 @@ const FORRETNINGSREGLER_INFO: { titel: string; forklaring: string }[] = [
   {
     titel: "Tilladte virksomhedsformer",
     forklaring:
-      "Kun leads med en af disse virksomhedsformer (fx ApS, A/S) slipper igennem R4-filteret ved CSV-import. Alt andet frasorteres automatisk.",
+      "Kun leads med en af disse virksomhedsformer (fx ApS, A/S) slipper igennem R4-filteret ved den automatiske CVR-import. Alt andet frasorteres automatisk.",
   },
   {
     titel: "Virksomhedsformer for fysiske personer",
@@ -428,7 +428,7 @@ function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfigurat
         </button>
       </div>
       <p className="mb-4 text-sm text-tekst-daempet">
-        Styrer R4-filteret ved CSV-import (Leads → Importér leads). Kun synlig for ejere.
+        Styrer R4-filteret ved den automatiske CVR-import (Leads → Leads fra CVR). Kun synlig for ejere.
       </p>
 
       <form action={action} className="flex flex-col gap-4">

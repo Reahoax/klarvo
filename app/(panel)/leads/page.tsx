@@ -134,7 +134,7 @@ export default async function LeadsSide({
             href="/leads/importer"
             className="glow-accent shrink-0 rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-tekst"
           >
-            Importér leads
+            Leads fra CVR
           </Link>
         </div>
 
@@ -402,13 +402,13 @@ export default async function LeadsSide({
               <div className="rounded-lg border border-kant bg-flade px-6 py-10 text-center">
                 <p className="text-sm text-tekst">Der er endnu ingen leads.</p>
                 <p className="mt-1 text-sm text-tekst-daempet">
-                  Importér en CSV-fil fra cvr.dk for at komme i gang.
+                  Leads hentes automatisk fra CVR hver nat — de dukker op her, når første kørsel er sket.
                 </p>
                 <Link
                   href="/leads/importer"
                   className="glow-accent mt-4 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-tekst"
                 >
-                  Importér leads
+                  Se status
                 </Link>
               </div>
             )}

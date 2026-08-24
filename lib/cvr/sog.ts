@@ -7,18 +7,22 @@
 // aktiv-filter frem for "nyesteStatus" (som ofte er null på ældre virksomheder).
 const CVR_BASIS_URL = "http://distribution.virk.dk/cvr-permanent";
 
-// from + size må maks. være 3000 tilsammen (bekræftet i mapping-metadata) -
-// større uddrag kræver Elasticsearchs Scroll API, som ikke er bygget endnu.
+// Et enkelt from+size-kald må maks dække 3000 (bekræftet i mapping-metadata) -
+// derfor sorteres og pagineres der med search_after (se koerCvrImport i
+// lib/cvr/importer.ts for selve gennemløbet på tværs af flere kald/nætter).
 export const CVR_MAKS_RESULTAT_VINDUE = 3000;
 
 export type CvrSoegeParametre = {
   virksomhedsformer?: string[]; // fx ["APS", "A/S"] - kortBeskrivelse-værdier, se lib/cvr/mapning.ts
-  fra?: number;
   size?: number;
+  // Sidste cvrNummer fra forrige side - Elasticsearchs search_after-mekanisme.
+  // Statsløs (modsat Scroll API), så den fungerer fint på tværs af cron-kørsler
+  // med et døgns mellemrum, uden en udløbende server-side tilstand.
+  efterCvrNummer?: string;
 };
 
 export type CvrSoegeResultat =
-  | { ok: true; total: number; virksomheder: unknown[] }
+  | { ok: true; total: number; virksomheder: unknown[]; sidsteCvrNummer: string | null }
   | { ok: false; besked: string };
 
 export async function sogVirksomheder(
@@ -43,12 +47,15 @@ export async function sogVirksomheder(
     });
   }
 
-  const body = {
+  const body: Record<string, unknown> = {
     query: { bool: { must } },
-    from: parametre.fra ?? 0,
+    sort: [{ "Vrvirksomhed.cvrNummer": "asc" }],
     size: parametre.size ?? 50,
     _source: ["Vrvirksomhed"],
   };
+  if (parametre.efterCvrNummer) {
+    body.search_after = [parametre.efterCvrNummer];
+  }
 
   try {
     const res = await fetch(`${CVR_BASIS_URL}/_search`, {
@@ -65,11 +72,17 @@ export async function sogVirksomheder(
 
     const json = await res.json();
     const total = json.hits?.total?.value ?? json.hits?.total ?? 0;
-    const virksomheder = (json.hits?.hits ?? [])
-      .map((h: { _source: { Vrvirksomhed?: unknown } }) => h._source.Vrvirksomhed)
+    const traeffere: { _source: { Vrvirksomhed?: { cvrNummer?: unknown } }; sort?: unknown[] }[] =
+      json.hits?.hits ?? [];
+
+    const virksomheder = traeffere
+      .map((h) => h._source.Vrvirksomhed)
       .filter((v: unknown) => v !== undefined);
 
-    return { ok: true, total, virksomheder };
+    const sidste = traeffere.length > 0 ? traeffere[traeffere.length - 1] : null;
+    const sidsteCvrNummer = sidste ? String(sidste._source.Vrvirksomhed?.cvrNummer ?? "") || null : null;
+
+    return { ok: true, total, virksomheder, sidsteCvrNummer };
   } catch (fejl) {
     return { ok: false, besked: fejl instanceof Error ? fejl.message : "Ukendt fejl." };
   }
