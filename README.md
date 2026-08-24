@@ -50,21 +50,15 @@ via UI'et. **Brugeren afviste eksplicit en manuel "Hent fra CVR"-knap** ("Man sk
 selv hente den. De skal bare være der lige fra start af") — byg ikke en manuel udløser
 tilbage uden at spørge; automatisk kørsel via cron er det bekræftede krav.
 
-**Afventer brugeren (ny, 2026-08-24):** `SUPABASE_SERVICE_ROLE_KEY` skal sættes som
-miljøvariabel i Vercel, før den automatiske CVR-import rent faktisk virker. Jeg kan ikke
-hente eller sætte den selv (den omgår RLS fuldstændigt og er bevidst ikke tilgængelig via
-Supabase MCP-værktøjerne) — brugeren skal selv køre `vercel env add
-SUPABASE_SERVICE_ROLE_KEY production` i egen terminal. **Bemærk navneskiftet:**
-Supabase har udfaset "service_role"/"anon"-navngivningen til fordel for "Secret
-keys"/"Publishable key" (samme funktion, nyt navn — legacy-nøglerne udfases helt i
-løbet af 2026). Nøglen findes derfor i Supabase-dashboardet → **Settings → API
-Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
-bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, så
-spørg ikke om "service_role key" igen, brug "Secret key". Uden den fejler
-`/api/cron/cvr-import` sikkert med en tydelig fejlbesked i Vercel-loggen
-("SUPABASE_SERVICE_ROLE_KEY mangler som miljøvariabel") — ikke en nedbrudt app,
-bare ingen automatisk import endnu. Spørg om dette er sat, før du antager at
-automatisk import kører.
+**Løst (2026-08-24):** `SUPABASE_SERVICE_ROLE_KEY` er nu sat i Vercel (Production),
+og den automatiske CVR-import er bekræftet virkende ende-til-ende i produktion —
+se "Automatisk CVR-import" nedenfor for detaljer og tal. **Husk navneskiftet, hvis
+nøglen nogensinde skal genskabes/roteres:** Supabase har udfaset
+"service_role"/"anon"-navngivningen til fordel for "Secret keys"/"Publishable key"
+(samme funktion, nyt navn). Nøglen findes i Supabase-dashboardet → **Settings →
+API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
+bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
+"Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
 **Sidste session (2026-08-14):** Ikoner tilføjet i hele appen (sidebar, Indstillinger,
 brugermenu, sideoverskrifter, stat-kort) via `lucide-react` (nyt, eneste tilføjede
@@ -212,7 +206,7 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
-| 11 — CVR API-integration | Delvist (2026-08-24): forbindelse, søgning, feltmapping og import til Leads er bygget og testet live (10 rigtige virksomheder importeret korrekt via en midlertidig testknap). Kører som et Vercel Cron-job (dagligt), ikke en manuel knap — se "Automatisk CVR-import" nedenfor. **Mangler:** `SUPABASE_SERVICE_ROLE_KEY` skal sættes i Vercel, før cron-jobbet reelt kan køre i produktion, og selve cron-kørslen er derfor ikke ende-til-ende-bekræftet endnu. CSV-import er stadig aktiv sideløbende — fjernes først når cron er bekræftet stabil |
+| 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. CSV-import er stadig aktiv sideløbende — fjernes først når cron har kørt stabilt et par dage, se "Etablerede mønstre" |
 | 8, 9, 12 | Ikke bygget endnu |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
@@ -451,23 +445,24 @@ Cron**-job, ikke en handling en bruger udløser:
 - Status for seneste automatiske kørsel vises på `/leads/importer` (kun `ejer`),
   hentet fra nyeste `soegninger`-række med `parametre->>kilde = 'cvr_api'`.
 
-**Krævet miljøvariabel, IKKE sat endnu:** `SUPABASE_SERVICE_ROLE_KEY` i Vercel. Se
-"Afventer brugeren" øverst i filen. `CRON_SECRET` er allerede sat i alle tre Vercel-
-miljøer (jeg genererede og satte den selv via `vercel env add`, da det er et internt,
-selv-genereret token — ikke et tredjeparts-login, så det var ikke problematisk at
-håndtere direkte).
+**Status: fuldt bekræftet virkende i produktion (2026-08-24).**
+`SUPABASE_SERVICE_ROLE_KEY` er sat (Vercel har udfaset "service_role"-navnet til
+fordel for "Secret keys" i dashboardet — samme funktion, forvirrede brugeren
+første gang, se historik nedenfor). `CRON_SECRET` var allerede sat i alle tre
+Vercel-miljøer (genereret og sat direkte af mig, da det er et internt,
+selv-genereret token — ikke et tredjeparts-login). Endpointet blev kaldt
+manuelt mod selve produktions-URL'en for at bekræfte hele kæden (secret →
+service-klient → CVR-opslag → upsert i leads) virker: **200 hentet, 200
+importeret, 134 korrekt spærret (reklamebeskyttet)**. Cron-jobbet kører nu af
+sig selv hver nat kl. 05:00 UTC (07:00 dansk sommertid) uden yderligere
+handling.
 
-**Testet, men med reduceret omfang:** en manuel test (10 virksomheder, ejer-rolle,
-via en midlertidig UI-knap som siden blev fjernet) importerede korrekt til Leads —
-rigtige navne, CVR-numre, adresser, virksomhedsform-filter og R3-reklamebeskyttelse
-virkede alle sammen. Selve cron-routens auth-gate (401 uden/med forkert secret) er
-verificeret lokalt; den fulde ende-til-ende-kørsel via Vercel Cron er IKKE verificeret
-endnu, da `SUPABASE_SERVICE_ROLE_KEY` mangler i produktionsmiljøet.
-
-**Næste skridt:** 1) brugeren sætter `SUPABASE_SERVICE_ROLE_KEY`, 2) bekræft en
-rigtig cron-kørsel virker i Vercel-loggen, 3) fjern CSV-import helt (brugeren har
-bedt om det, men først når den automatiske import er bekræftet stabil - se
-"Etablerede mønstre").
+**Tilbageværende, ikke-hastende:** fjern CSV-import helt (brugeren har bedt om
+det eksplicit, men først når automatisk import har kørt stabilt et par dage -
+se "Etablerede mønstre"). Overvej også: adgangs-hyppighed (dagligt er
+Hobby-plan-loftet; opgradér hvis oftere ønskes), og om `koerCvrImport`'s
+faste batch-størrelse (200) skal gøres konfigurerbar eller udvides med
+Scroll API for at dække mere af det samlede marked over tid.
 
 ## Teknisk stack
 
