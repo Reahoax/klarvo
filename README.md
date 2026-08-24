@@ -60,6 +60,23 @@ API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
 bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
 "Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
+**Sidste session, del 4 (2026-08-24):** Etape 9 — Matching (Skærmbillede G),
+regelbaseret del. Brugeren bad om at "køre videre" lige efter Segmenter (del 3
+nedenfor) blev leveret - næste naturlige skridt i Spec.md's rækkefølge, og
+bygger direkte oven på kundernes ICP-felt. Ny side `/matching` (nav-punktet
+"G" fandtes allerede som placeholder, `href` er nu sat) viser ukoblede,
+kontaktbare leads matchet mod aktive kunders ICP med begrundelse i klartekst -
+se "Status"-tabellen og `lib/matching/score.ts`. **Fejl fundet og rettet
+undervejs:** CVR-importen gemmer `virksomhedsform` som `"APS"` (versaler, se
+`lib/cvr/mapning.ts`), mens den eksisterende ICP-formulars placeholder
+("fx ApS, A/S") aktivt foreslår blandet case - en bruger, der fulgte
+eksemplet, ville aldrig få et match. Rettet med en case-insensitiv
+sammenligning i `matchLeadModIcp` (ikke kun i den nye Matching-kode, men
+også relevant hvis ICP-feltet nogensinde bruges andre steder til
+sammenligning). "Afvis" på Matching-siden er bevidst kun klient-side (ingen
+tabel til afviste forslag) - genindlæses siden, dukker et afvist forslag op
+igen, indtil leadet enten er tildelt eller ikke længere matcher.
+
 **Sidste session, del 3 (2026-08-24):** Etape 7C — Segmenter (den forreste halvdel
 af Spec.md "I. ICP-analyse og segmenter"). Brugeren bad om at komme i gang med
 "ICP osv." og valgte eksplicit segmenter først, ikke den bagudrettede ICP-analyse
@@ -249,7 +266,7 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
 | 7C — ICP-analyse og segmenter | Delvist bygget (2026-08-24): **segmenter** er på plads — navngivne ICP'er pr. kunde (`segmenter`-tabellen, samme kriterie-form som `kunder.icp`), med statistik pr. segment (leads tilknyttet, ringet, kontaktrate, mødrate - se `lib/segmenter/statistik.ts`) og manuel tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment"). **ICP-analysen** (bagudrettet: upload liste over bedste kunder → CVR-opslag → statistisk udkast til ICP) er ikke bygget - brugeren valgte eksplicit at starte med segmenter først |
 | 8, 12 | Ikke bygget endnu |
-| 9 — Matching | Ikke bygget (automatisk foreslået score/begrundelse) - manuel tildeling til kunde/segment findes allerede, se Etape 7C |
+| 9 — Matching | Regelbaseret del bygget (2026-08-24): `/matching` viser ukoblede, kontaktbare leads matchet mod aktive kunders ICP (branchekode, ansattal, geografi, virksomhedsform, ikke spærret - se `lib/matching/score.ts`), med begrundelse i klartekst og Tildel/Afvis. Systemet tildeler aldrig selv. Signalbaseret vægtning (jobopslag, vækst m.v.) afventer OSINT-indsamling (Etape 8), ikke bygget - matches er derfor ja/nej, ikke en gradueret score |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
 **Udover Spec.md:**
@@ -624,6 +641,12 @@ Ordino/
                                   tilknyttede leads
       soegninger/
         page.tsx                 Liste over gemte søgninger (ikke i venstremenuen)
+      matching/
+        page.tsx                 Skærmbillede G (Etape 9): ukoblede leads matchet mod
+                                  aktive kunders ICP, med begrundelse - kun regelbaseret,
+                                  signalvægtning afventer OSINT (Etape 8)
+        match-raekke.tsx          Klientkomponent: Tildel (genbruger tildelKunde fra
+                                  leads/[id]/actions.ts) og Afvis (kun klient-side skjul)
   lib/
     nav.ts                      Venstremenuens punkter, grupperet ("Hjem"-gruppe
                                 med Dashboard er uden for Spec.md's bogstaver B-J)
@@ -643,6 +666,10 @@ Ordino/
       statistik.ts                  Etape 7C: antal leads/ringet/kontaktrate/mødrate
                                     pr. segment, ud fra lead_segmenter + aktiviteter +
                                     moeder - ren funktion + tests
+    matching/
+      score.ts                      Etape 9: regelbaserede hårde kriterier (branchekode,
+                                    ansattal, geografi, virksomhedsform, ikke spærret) -
+                                    ren funktion + tests, case-insensitiv virksomhedsform
     supabase/
       client.ts                  Supabase-klient til browseren
       server.ts                  Supabase-klient til server components/actions

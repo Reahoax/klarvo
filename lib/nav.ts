@@ -47,7 +47,7 @@ export const navGrupper: NavGruppe[] = [
     label: "Kunder",
     punkter: [
       { bogstav: "E", navn: "Kunder", href: "/kunder", Ikon: Handshake },
-      { bogstav: "G", navn: "Matching", href: null, Ikon: Shuffle },
+      { bogstav: "G", navn: "Matching", href: "/matching", Ikon: Shuffle },
       { bogstav: "I", navn: "Kundeprofil (ICP) og segmenter", href: null, Ikon: Target },
     ],
   },
