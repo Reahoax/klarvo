@@ -54,11 +54,16 @@ tilbage uden at spørge; automatisk kørsel via cron er det bekræftede krav.
 miljøvariabel i Vercel, før den automatiske CVR-import rent faktisk virker. Jeg kan ikke
 hente eller sætte den selv (den omgår RLS fuldstændigt og er bevidst ikke tilgængelig via
 Supabase MCP-værktøjerne) — brugeren skal selv køre `vercel env add
-SUPABASE_SERVICE_ROLE_KEY production` i egen terminal (nøglen findes i Supabase-
-dashboardet → Project Settings → API → "service_role"), eller tilføje den via Vercel-
-dashboardet. Uden den fejler `/api/cron/cvr-import` sikkert med en tydelig fejlbesked i
-Vercel-loggen ("SUPABASE_SERVICE_ROLE_KEY mangler som miljøvariabel") — ikke en nedbrudt
-app, bare ingen automatisk import endnu. Spørg om dette er sat, før du antager at
+SUPABASE_SERVICE_ROLE_KEY production` i egen terminal. **Bemærk navneskiftet:**
+Supabase har udfaset "service_role"/"anon"-navngivningen til fordel for "Secret
+keys"/"Publishable key" (samme funktion, nyt navn — legacy-nøglerne udfases helt i
+løbet af 2026). Nøglen findes derfor i Supabase-dashboardet → **Settings → API
+Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
+bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, så
+spørg ikke om "service_role key" igen, brug "Secret key". Uden den fejler
+`/api/cron/cvr-import` sikkert med en tydelig fejlbesked i Vercel-loggen
+("SUPABASE_SERVICE_ROLE_KEY mangler som miljøvariabel") — ikke en nedbrudt app,
+bare ingen automatisk import endnu. Spørg om dette er sat, før du antager at
 automatisk import kører.
 
 **Sidste session (2026-08-14):** Ikoner tilføjet i hele appen (sidebar, Indstillinger,

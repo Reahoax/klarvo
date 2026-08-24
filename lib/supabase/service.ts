@@ -5,8 +5,9 @@ import { createClient } from "@supabase/supabase-js";
 // den må ALDRIG eksponeres til klienten eller bruges i almindelige
 // server actions, hvor opretServerKlient() (cookie/session-baseret) er det
 // rigtige valg. SUPABASE_SERVICE_ROLE_KEY findes i Supabase-dashboardet →
-// Project Settings → API → "service_role" (hemmelig, ikke det samme som
-// anon-nøglen) og skal sættes som miljøvariabel i Vercel, aldrig committes.
+// Settings → API Keys → "Secret keys" (Supabase har udfaset det ældre navn
+// "service_role" til fordel for dette, samme funktion) og skal sættes som
+// miljøvariabel i Vercel, aldrig committes.
 export function opretServiceKlient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
