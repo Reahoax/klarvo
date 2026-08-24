@@ -84,6 +84,18 @@ uforklarlig 500 fra GoTrue: "converting NULL to string is unsupported"), samt
 en kolonne-rettighed der manglede (`grant update (avatar_url) on profiler` —
 samme mønster som `navn`, se "Hvordan man ændrer konfiguration").
 
+**Kendt driftsrisiko, bevidst udskudt (brugerens ord, 2026-08-24):** Supabase-org'en
+(`walfpzsfkivzelncqmbh`) kører på **free-planen**, som auto-pauser projektet efter
+~en uges inaktivitet — det er præcis det, der gjorde at databasen var nede og
+skulle genstartes manuelt midt i denne session (se "CVR system-til-system-adgang"
+og selve migrationsarbejdet for detaljerne). Så længe Klarvo kun bruges internt
+("lige nu køre vi det bare for os selv"), er det accepteret. **Før systemet sælges
+videre til rigtige kunder, skal Supabase opgraderes til Pro-planen** (~$25/md,
+fjerner auto-pause) — [supabase.com/dashboard/org/walfpzsfkivzelncqmbh/billing](https://supabase.com/dashboard/org/walfpzsfkivzelncqmbh/billing).
+Byg det ikke om for at kompensere i koden (fx retry-logik) — det er en
+plan-indstilling, ikke en kodefejl. Spørg ikke om dette igen, medmindre brugeren
+nævner kunder/salg/lancering, eller databasen pauser uventet igen.
+
 **Efterspurgt, endnu ikke bygget (brugerens ord, 2026-08-13):** En "Kontrakt"-
 afdeling under Overblik eller Kunder, der gemmer alle kontrakter elektronisk pr.
 firma/kunde, OG som selv kan generere kontrakter, så de er nemme at sende ud.
