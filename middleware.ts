@@ -38,6 +38,13 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const erLoginSide = request.nextUrl.pathname.startsWith("/login");
+  // Cron-routen har ingen indlogget bruger - den autoriseres af sit eget
+  // CRON_SECRET-tjek (se app/api/cron/cvr-import/route.ts), ikke af en session.
+  const erCronRoute = request.nextUrl.pathname.startsWith("/api/cron/");
+
+  if (erCronRoute) {
+    return response;
+  }
 
   if (!user && !erLoginSide) {
     const loginUrl = new URL("/login", request.url);

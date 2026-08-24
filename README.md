@@ -32,18 +32,34 @@ Vercel er endnu ikke koblet til GitHub-reposet (auto-deploy ved push) — kun
 foreslået, ikke bekræftet.
 
 **Sidste session (2026-08-24):** Etape 10 (Møder og saldo — bookingflow, kvalitetstjek,
-mødestatus) og en ny CVR-forbindelse (Indstillinger → Integrationer, ejer-only) blev
-bygget. Brugeren har fået sin system-til-system-adgang fra Erhvervsstyrelsen og testede
-den live sammen med mig — se "CVR system-til-system-adgang" nedenfor for de bekræftede
-tekniske detaljer (endpoint, alias-struktur, auth). **Vigtigt hændelsesforløb:** brugeren
-limede sit rigtige CVR-brugernavn/password ind i chatten to gange under fejlfinding af
-curl-kommandoer. Jeg brugte det ikke til noget (kørte ingen kald med det selv), bad om at
-det blev skiftet, og nægtede at genbruge det gamle password i eksempler, selv efter direkte
-bedt om det. Konsekvensen blev en ny, sikker "Integrationer"-fane, hvor login gemmes i en
-egen database-tabel (`cvr_forbindelse`) med RLS strammere end appens sædvanlige mønster —
-se afsnittet nedenfor for hvorfor. **Vær opmærksom fremover:** hvis brugeren igen limer
-rigtige credentials/secrets direkte ind i chatten, følg samme linje — brug dem ikke, bed om
-rotation, og pointér tilbage til at teste i deres egen terminal eller via UI'et.
+mødestatus), en ny CVR-forbindelse (Indstillinger → Integrationer, ejer-only), OG en
+**automatisk, planlagt CVR-import** blev bygget. Brugeren har fået sin system-til-system-
+adgang fra Erhvervsstyrelsen, testede forbindelsen live sammen med mig, og et rigtigt
+testtræk (10 virksomheder) blev importeret korrekt til Leads — se "CVR system-til-system-
+adgang" nedenfor for de bekræftede tekniske detaljer (endpoint, alias-struktur, felt-
+mapping) og "Automatisk CVR-import" for hvordan den kører. **Vigtigt hændelsesforløb:**
+brugeren limede sit rigtige CVR-brugernavn/password ind i chatten to gange under
+fejlfinding af curl-kommandoer. Jeg brugte det ikke til noget (kørte ingen kald med det
+selv), bad om at det blev skiftet, og nægtede at genbruge det gamle password i eksempler,
+selv efter direkte bedt om det. Konsekvensen blev en ny, sikker "Integrationer"-fane, hvor
+login gemmes i en egen database-tabel (`cvr_forbindelse`) med RLS strammere end appens
+sædvanlige mønster — se afsnittet nedenfor for hvorfor. **Vær opmærksom fremover:** hvis
+brugeren igen limer rigtige credentials/secrets direkte ind i chatten, følg samme linje —
+brug dem ikke, bed om rotation, og pointér tilbage til at teste i deres egen terminal eller
+via UI'et. **Brugeren afviste eksplicit en manuel "Hent fra CVR"-knap** ("Man skal ikke
+selv hente den. De skal bare være der lige fra start af") — byg ikke en manuel udløser
+tilbage uden at spørge; automatisk kørsel via cron er det bekræftede krav.
+
+**Afventer brugeren (ny, 2026-08-24):** `SUPABASE_SERVICE_ROLE_KEY` skal sættes som
+miljøvariabel i Vercel, før den automatiske CVR-import rent faktisk virker. Jeg kan ikke
+hente eller sætte den selv (den omgår RLS fuldstændigt og er bevidst ikke tilgængelig via
+Supabase MCP-værktøjerne) — brugeren skal selv køre `vercel env add
+SUPABASE_SERVICE_ROLE_KEY production` i egen terminal (nøglen findes i Supabase-
+dashboardet → Project Settings → API → "service_role"), eller tilføje den via Vercel-
+dashboardet. Uden den fejler `/api/cron/cvr-import` sikkert med en tydelig fejlbesked i
+Vercel-loggen ("SUPABASE_SERVICE_ROLE_KEY mangler som miljøvariabel") — ikke en nedbrudt
+app, bare ingen automatisk import endnu. Spørg om dette er sat, før du antager at
+automatisk import kører.
 
 **Sidste session (2026-08-14):** Ikoner tilføjet i hele appen (sidebar, Indstillinger,
 brugermenu, sideoverskrifter, stat-kort) via `lucide-react` (nyt, eneste tilføjede
@@ -126,6 +142,11 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 2026-08-24 — se "CVR system-til-system-adgang" nedenfor.
 
 **Etablerede mønstre — følg dem, medmindre brugeren beder om andet:**
+- **CVR-import er automatisk (cron), ikke en knap brugeren klikker.** Bygget
+  først som en manuel "Hent fra CVR"-knap, som brugeren eksplicit afviste:
+  "Man skal ikke selv hente den. De skal bare være der lige fra start af."
+  Knappen/actionen blev fjernet igen samme session. Byg den ikke tilbage uden
+  at spørge — se "Automatisk CVR-import" for hvordan det er løst i stedet.
 - Hurtige handlinger (opret/rediger noget lille) bygges som pop-op'er
   (`fixed inset-0` + backdrop), ikke som nye sider — se `kunder/ny-kunde-modal.tsx`
   eller `indstillinger-modal.tsx`. Kun indhold, der reelt kræver en hel side
@@ -186,7 +207,7 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
-| 11 — CVR API-integration | Delvist (2026-08-24): forbindelsen (Indstillinger → Integrationer, ejer-only) er bygget og testet live mod det rigtige Erhvervsstyrelse-endpoint — se "CVR system-til-system-adgang" nedenfor. Selve datatrækket (søgning, filtrering, lagring i Supabase) er IKKE bygget endnu — det er næste skridt |
+| 11 — CVR API-integration | Delvist (2026-08-24): forbindelse, søgning, feltmapping og import til Leads er bygget og testet live (10 rigtige virksomheder importeret korrekt via en midlertidig testknap). Kører som et Vercel Cron-job (dagligt), ikke en manuel knap — se "Automatisk CVR-import" nedenfor. **Mangler:** `SUPABASE_SERVICE_ROLE_KEY` skal sættes i Vercel, før cron-jobbet reelt kan køre i produktion, og selve cron-kørslen er derfor ikke ende-til-ende-bekræftet endnu. CSV-import er stadig aktiv sideløbende — fjernes først når cron er bekræftet stabil |
 | 8, 9, 12 | Ikke bygget endnu |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
@@ -354,18 +375,35 @@ Etape 11's datakilde. Erhvervsstyrelsens Elasticsearch-baserede løsning — log
     ikke på virksomheden selv)
   - `Vrdeltagerperson.*` — deltagere/personkreds
   - Et fjerde metadata-indeks (kun tidsstempler)
-- **Der findes ikke separate URL'er som `/virksomhed/_search`** — det gav 404 fra
-  nginx-proxyen foran Elasticsearch, som tilsyneladende kun ruter `/cvr-permanent/...`.
-  Søg mod `cvr-permanent/_search` og filtrér på `Vrvirksomhed.*`-felter i `query`
-  eller `_source` — kun virksomheds-dokumenter har de felter, så det virker som et
-  filter i praksis.
+- **Søgning sker mod `cvr-permanent/_search`** (POST, JSON query DSL) — der findes
+  ikke separate URL'er som `/virksomhed/_search` eller `/cvr-v/_search` (begge gav 404
+  fra nginx-proxyen foran Elasticsearch, som kun ruter `/cvr-permanent/...`). Filtrér i
+  stedet på `Vrvirksomhed.*`-felter i selve `query`'en, eller på at feltet findes i
+  `_source` — kun virksomheds-dokumenter har de felter.
 - **`max_result_window: 3000` bekræftet** — brug Elasticsearch Scroll API for større
-  uddrag end det.
+  uddrag end det (ikke bygget endnu, se `lib/cvr/sog.ts`).
 - Nested felter (`navne`, `hovedbranche`, `beliggenhedsadresse`, `virksomhedsstatus`
   m.fl.) har `include_in_parent: true` i mappingen, så almindelige flade
   `term`/`match`-forespørgsler på fx `Vrvirksomhed.hovedbranche.branchekode` virker
   uden en fuld `nested`-query-indpakning.
 - ES-version er 6.x-serien (ikke 1.7.4, som en uofficiel tredjepartskilde påstod).
+- **`virksomhedMetadata` er guldet** — et denormaliseret "nyeste værdi"-objekt direkte
+  på hvert virksomhedsdokument (`nyesteNavn`, `nyesteVirksomhedsform`,
+  `nyesteHovedbranche`, `nyesteBeliggenhedsadresse`, `nyesteAarsbeskaeftigelse` m.fl.),
+  så man IKKE selv skal lede den gyldige periode frem i tidsserie-arrays. Brugt i
+  `lib/cvr/mapning.ts`.
+- **`virksomhedMetadata.nyesteStatus` er ofte `null`**, selv på gamle virksomheder med
+  data — brug i stedet **`virksomhedMetadata.sammensatStatus`** (en almindelig
+  tekststreng, "NORMAL" for aktive) som aktiv-filter. Skal søges med `match`, ikke
+  `term` — feltet er analyseret tekst uden `.keyword`-underfelt, og den danske
+  analyzer lowercaser alt.
+- **`Vrvirksomhed.virksomhedMetadata.nyesteVirksomhedsform.kortBeskrivelse`** har
+  samme lowercase-fælde ved `terms`-forespørgsler — værdier som `konfiguration.
+  tilladte_virksomhedsformer` (fx "ApS") skal lowercases før søgning, da det
+  bagvedliggende ES-felt er `"APS"` → indekseret som `"aps"`.
+- **`reklamebeskyttet`** (ikke `reklamebeskyttelse`) ligger direkte på roden af
+  `Vrvirksomhed`, ikke i `virksomhedMetadata`.
+- `cvrNummer` kommer som et JSON-tal, ikke en streng — husk `String()` ved mapning.
 
 **Hvor login gemmes:** tabellen `cvr_forbindelse` (singleton-række, `id boolean
 primary key default true`), skrives/læses via Indstillinger → Integrationer
@@ -376,12 +414,55 @@ rolle = 'ejer')`), fordi rækken indeholder et rigtigt tredjeparts-login, ikke b
 forretningsregler. Password'et ekkoes aldrig tilbage til klienten: `layout.tsx`
 henter bevidst kun `brugernavn, forbundet_tidspunkt, sidst_testet, sidst_test_ok,
 sidst_test_besked` fra tabellen, aldrig `password`-kolonnen, uanset at RLS ville
-tillade ejer at læse den. `lib/cvr/klient.ts` har selve HTTP-kaldet (bruges af
-"Test forbindelse"-knappen); genbrug den, når det rigtige datatræk bygges.
+tillade ejer at læse den. `lib/cvr/klient.ts` har "Test forbindelse"-kaldet;
+`lib/cvr/sog.ts` har selve søgningen; `lib/cvr/mapning.ts` mapper ét råt
+CVR-dokument til `leads`-tabellens rækkeform (samme form som CSV-importen bruger,
+se `lib/leads/import.ts`'s `KlarLeadRaekke`) — testet mod rigtige dokumenter, se
+`lib/cvr/__tests__/mapning.test.ts`.
 
-**Næste skridt (ikke bygget):** selve søgning/filtrering/lagring af CVR-data i
-Supabase (Fase 2-3 i brugerens oprindelige plan). Se "Efterspurgt, endnu ikke
-bygget" og brugerens fase-inddeling, hvis den findes i chatten, for rækkefølgen.
+## Automatisk CVR-import
+
+Bygget 2026-08-24, efter brugeren eksplicit afviste en manuel "Hent"-knap — leads
+skal "bare være der" uden at nogen selv henter dem. Kører derfor som et **Vercel
+Cron**-job, ikke en handling en bruger udløser:
+
+- **`vercel.json`** definerer skemaet (`/api/cron/cvr-import`, dagligt kl. 05:00 UTC
+  = 07:00 dansk sommertid). Vercels Hobby-plan tillader kun ét kald i døgnet pr.
+  cron-job — juster skemaet, hvis planen opgraderes og hyppigere import ønskes.
+- **`app/api/cron/cvr-import/route.ts`** — selve endpointet. Ingen indlogget bruger
+  er involveret (Vercel Cron kalder det server-til-server), så det autoriseres af
+  `CRON_SECRET` (Vercel sætter automatisk `Authorization: Bearer $CRON_SECRET` på
+  planlagte kald) i stedet for en ejer-rolle. `middleware.ts` har en eksplicit
+  undtagelse for `/api/cron/*`, så login-redirect'en ikke rammer den.
+- **`lib/supabase/service.ts`** — en Postgres-klient med `SUPABASE_SERVICE_ROLE_KEY`,
+  som omgår RLS fuldstændigt. Nødvendig fordi cron-routen ikke har en brugers
+  session-cookie til at læse `cvr_forbindelse` (ejer-scoped RLS) igennem. Brug
+  **ALDRIG** denne klient i almindelige server actions — kun i baggrundsjob uden
+  bruger, og aldrig eksponeret til klienten.
+- **`lib/cvr/importer.ts`** — selve import-logikken (søg → filtrér → upsert →
+  snapshot), delt mellem cron-routen og (hvis den bygges senere) en eventuel manuel
+  udløser. Tager en allerede-autoriseret Supabase-klient som parameter i stedet for
+  selv at tjekke session/rolle.
+- Status for seneste automatiske kørsel vises på `/leads/importer` (kun `ejer`),
+  hentet fra nyeste `soegninger`-række med `parametre->>kilde = 'cvr_api'`.
+
+**Krævet miljøvariabel, IKKE sat endnu:** `SUPABASE_SERVICE_ROLE_KEY` i Vercel. Se
+"Afventer brugeren" øverst i filen. `CRON_SECRET` er allerede sat i alle tre Vercel-
+miljøer (jeg genererede og satte den selv via `vercel env add`, da det er et internt,
+selv-genereret token — ikke et tredjeparts-login, så det var ikke problematisk at
+håndtere direkte).
+
+**Testet, men med reduceret omfang:** en manuel test (10 virksomheder, ejer-rolle,
+via en midlertidig UI-knap som siden blev fjernet) importerede korrekt til Leads —
+rigtige navne, CVR-numre, adresser, virksomhedsform-filter og R3-reklamebeskyttelse
+virkede alle sammen. Selve cron-routens auth-gate (401 uden/med forkert secret) er
+verificeret lokalt; den fulde ende-til-ende-kørsel via Vercel Cron er IKKE verificeret
+endnu, da `SUPABASE_SERVICE_ROLE_KEY` mangler i produktionsmiljøet.
+
+**Næste skridt:** 1) brugeren sætter `SUPABASE_SERVICE_ROLE_KEY`, 2) bekræft en
+rigtig cron-kørsel virker i Vercel-loggen, 3) fjern CSV-import helt (brugeren har
+bedt om det, men først når den automatiske import er bekræftet stabil - se
+"Etablerede mønstre").
 
 ## Teknisk stack
 
