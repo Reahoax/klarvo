@@ -322,7 +322,7 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 5 — AI-berigelse | Bygget (2026-08-26), men **ikke i drift** — afventer `ANTHROPIC_API_KEY` fra dig. Manuel "Berig med AI"-knap pr. lead på leaddetaljer, model `claude-haiku-4-5`. Se "Etape 5 — AI-berigelse" nedenfor |
 | 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
 | 7C — ICP-analyse og segmenter | Delvist bygget (2026-08-24): **segmenter** er på plads — navngivne ICP'er pr. kunde (`segmenter`-tabellen, samme kriterie-form som `kunder.icp`), med statistik pr. segment (leads tilknyttet, ringet, kontaktrate, mødrate - se `lib/segmenter/statistik.ts`) og manuel tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment"). **ICP-analysen** (bagudrettet: upload liste over bedste kunder → CVR-opslag → statistisk udkast til ICP) er ikke bygget - brugeren valgte eksplicit at starte med segmenter først |
-| 8 — OSINT-signaler | Delvist bygget (2026-08-26): fundamentet (rate limiting, robots.txt, 30-dages cache) plus to kildetyper - "website" (titel + meta-beskrivelse fra forsiden) og "jobopslag" (finder et karriere-/jobside-link i forsidens HTML ud fra nøgleord, henter den samme måde). De to deler ét robots.txt-opslag og én rate-limit-slot pr. domæne. Testet ende-til-ende mod example.com: email-spærring, robots.txt-respekt, cache-genbrug, korrekt håndteret 404 og korrekt "intet karriere-link fundet" blev alle bekræftet. Øvrige fire kildetyper (regnskab, cvr_aendring, presse, anmeldelse) er ikke bygget - "én kildetype ad gangen" |
+| 8 — OSINT-signaler | Delvist bygget: fundamentet plus tre kildetyper - "website", "jobopslag" (begge testet ende-til-ende mod example.com 2026-08-26) og "cvr_aendring" (2026-08-26, genbruger CVR API'et, ikke selvstændigt live-testet, se "Etape 8-udvidelse" nedenfor). "regnskab" og "anmeldelse" er undersøgt og blokeret af deres kilders egen robots.txt, ikke bygget. "presse" bevidst udskudt af brugeren til lancering |
 | 12 | Ikke bygget endnu |
 | 9 — Matching | Regelbaseret del bygget (2026-08-24): `/matching` viser ukoblede, kontaktbare leads matchet mod aktive kunders ICP (branchekode, ansattal, geografi, virksomhedsform, ikke spærret - se `lib/matching/score.ts`), med begrundelse i klartekst og Tildel/Afvis. Systemet tildeler aldrig selv. Signalbaseret vægtning (jobopslag, vækst m.v.) afventer OSINT-indsamling (Etape 8), ikke bygget - matches er derfor ja/nej, ikke en gradueret score |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
@@ -695,19 +695,71 @@ netværket, at en 404 hverken gemmer et tomt signal eller crasher siden, og
 at "intet karriere-link fundet" rapporteres korrekt uden et opdigtet
 jobopslag-signal (example.com har naturligvis ingen karriereside).
 
-**Tilbageværende, ikke-hastende:** de øvrige fire tilladte kildetyper
-(regnskaber.virk.dk, CVR-historik, Google/Bing-søgeresultater, Trustpilot) —
-jf. specens egen "én kildetype ad gangen". Signalbaseret vægtning i Matching
-(Etape 9) afventer at flere kildetyper findes at vægte imod. **Google/Bing-
-søgeresultater kræver en beslutning, før de bygges:** direkte scraping af
-selve Googles/Bings søgeresultatsider er i strid med deres brugsvilkår (og
-uden for "Tilladte kilder — byg mod disse" i ånd, som forudsætter lovligt
-tilgængelige data) — den rigtige vej er en officiel søge-API (fx Bing Web
-Search API via Azure, eller Google Custom Search JSON API), som kræver at
-brugeren selv opretter en konto og en API-nøgle, ligesom CVR-adgangen og den
-kommende `ANTHROPIC_API_KEY`. **Bevidst udskudt (brugerens ord, 2026-08-26):**
-"Lad os vente med det indtil at vi skubber det ud til kunder" — spørg ikke
-om dette igen, medmindre brugeren selv nævner lancering/kunder/søgning.
+### Etape 8-udvidelse (2026-08-26): CVR-ændring bygget, to kilder blokeret
+
+**cvr_aendring — bygget.** Genbruger den eksisterende CVR system-til-system-
+forbindelse (Etape 11, `cvr_forbindelse`) i stedet for at scrape en
+hjemmeside - "CVR-historik" er reelt bare de fulde tidsserie-arrays
+(`navne`, `beliggenhedsadresse`, `hovedbranche`, `virksomhedsstatus`,
+`livsforloeb`) på det samme Elasticsearch-dokument, Etape 11's søgning
+allerede henter en "nyeste"-opsummering af. `lib/cvr/historikOpslag.ts`
+henter ét fuldt dokument, `lib/signaler/cvrAendring.ts` udleder
+navneskift/adresseflytning/branchekodeskift/statusskift/stiftelse som en
+kronologisk liste (rene funktioner, fuldt testdækkede). Egen knap på
+leaddetaljer ("Hent CVR-historik"), delt rate-limit-spor i
+`signal_domaener` (nøgle `cvr-api-historik`, ikke leadets eget domæne, da
+kilden ikke er virksomhedens hjemmeside). **Feltnavnene er IKKE
+genverificeret mod et rigtigt CVR-svar i denne session** (kun struktureret
+efter samme periode-array-mønster, som allerede er bekræftet ægte for
+`hjemmeside`/`telefonNummer` i `lib/cvr/mapning.ts` fra Etape 11) - direkte
+credential-udtræk til en live-test blev blokeret af sessionens
+tilladelsesklassificer (samme årsag som testbruger-oprettelsen i Etape 5,
+se dér). Test mod et rigtigt CVR-nummer, før 100% bekræftet.
+
+**anmeldelse (Trustpilot) og regnskab (regnskaber.virk.dk) — undersøgt,
+begge blokeret af deres egen robots.txt, IKKE bygget:**
+
+- **Trustpilot** (`dk.trustpilot.com/robots.txt`): `User-agent: *` →
+  `Disallow: /` for alt. Kun navngivne søgemaskine-crawlere (Googlebot m.fl.)
+  har adgang - vores ærlige User-Agent ("Klarvo-signalindsamling") rammer
+  `*`-gruppen og bliver afvist på alt. At foregive at være Googlebot for at
+  omgå dette ville både bryde Spec.md's eget "aldrig omgåelse af blokering"
+  og være en løgn om identitet.
+- **regnskaber.virk.dk**: Erhvervsstyrelsens `offentliggoerelser`-index
+  (`http://distribution.virk.dk/offentliggoerelser/_search`, samme
+  Elasticsearch-vært som `cvr-permanent`) er faktisk helt åbent og
+  kræver INGEN login - bekræftet med et rigtigt opslag (CVR 21058378).
+  Men det indeks giver kun METADATA om hvornår et regnskab blev
+  offentliggjort (periode, godkendelsesdato, dirigent) plus et link til
+  selve dokumentet (XBRL/XHTML/PDF), ikke selve tallene (omsætning,
+  resultat, ansatte). De faktiske dokumenter ligger på
+  `regnskaber.virk.dk`, hvis `robots.txt` også har `User-agent: *` →
+  `Disallow: /` - samme blokering som Trustpilot, blot en anden vært.
+  At udtrække regnskabstal ville derfor kræve enten en selvstændig aftale
+  med Erhvervsstyrelsen om dokumentadgang (nævnt i deres egen
+  dokumentation som et krav for "annual report data"), eller reelt
+  at ignorere robots.txt - begge dele er enten en ny afklaring med
+  brugeren eller i strid med specens hårde regel. Ikke bygget.
+
+**Google/Bing-søgeresultater (presse) — bevidst udskudt, ikke en
+robots.txt-blokering:** direkte scraping af selve Googles/Bings
+søgeresultatsider er i strid med deres brugsvilkår (og uden for "Tilladte
+kilder — byg mod disse" i ånd, som forudsætter lovligt tilgængelige data)
+— den rigtige vej er en officiel søge-API (fx Bing Web Search API via
+Azure, eller Google Custom Search JSON API), som kræver at brugeren selv
+opretter en konto og en API-nøgle, ligesom CVR-adgangen og
+`ANTHROPIC_API_KEY`. **Bevidst udskudt (brugerens ord, 2026-08-26):** "Lad
+os vente med det indtil at vi skubber det ud til kunder" — spørg ikke om
+dette igen, medmindre brugeren selv nævner lancering/kunder/søgning.
+
+**Status efter denne udvidelse:** af de seks tilladte kildetyper er
+`website`, `jobopslag` og `cvr_aendring` bygget og virker. `regnskab` og
+`anmeldelse` er undersøgt og reelt blokeret af deres kilders egen
+robots.txt (ikke et "kom senere"-punkt - kræver enten en aftale med
+Erhvervsstyrelsen eller at brugeren accepterer at bryde robots.txt, hvilket
+Spec.md forbyder). `presse` afventer eksplicit brugerens eget "skub ud til
+kunder"-tidspunkt. Signalbaseret vægtning i Matching (Etape 9) kan nu
+begynde med tre kildetyper at vægte imod, i stedet for kun to.
 
 ## Etape 5 — AI-berigelse
 

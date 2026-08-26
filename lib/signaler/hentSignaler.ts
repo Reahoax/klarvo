@@ -3,7 +3,8 @@ import { udtraekDomaene } from "./domaene.ts";
 import { parseRobotsTxt, erTilladt, type RobotsRegelsaet } from "./robots.ts";
 import { uddragTitelOgBeskrivelse } from "./uddrag.ts";
 import { findKarriereLink } from "./karriere.ts";
-import { skalVente, erSignalFrisk } from "./tidsregler.ts";
+import { skalVente } from "./tidsregler.ts";
+import { hentFriskCache, type CachetSignal } from "./cache.ts";
 
 // Etape 8 (Spec.md "4B. OSINT") - de to første kildetyper, "website" og
 // "jobopslag", hentes samlet i ét kald: jobopslag-linket findes ved at lede i
@@ -24,26 +25,6 @@ export type SamletSignalResultat = {
   website: EnkeltSignalResultat;
   jobopslag: EnkeltSignalResultat;
 };
-
-type CachetSignal = { vaerdi: string; kilde_url: string; hentet_dato: string };
-
-async function hentFriskCache(
-  supabase: SupabaseClient,
-  leadId: string,
-  type: "website" | "jobopslag"
-): Promise<CachetSignal | null> {
-  const { data } = await supabase
-    .from("signaler")
-    .select("vaerdi, kilde_url, hentet_dato")
-    .eq("lead_id", leadId)
-    .eq("type", type)
-    .order("hentet_dato", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (data?.vaerdi && erSignalFrisk(new Date(data.hentet_dato))) return data;
-  return null;
-}
 
 function stiFraUrl(url: string): string {
   try {

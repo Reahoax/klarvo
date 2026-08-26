@@ -19,6 +19,7 @@ import { erSignalGammelt } from "@/lib/signaler/tidsregler.ts";
 import { godkendLead, opdaterPipelineStatus } from "./actions";
 import { TildelKundeForm } from "./tildel-kunde-form";
 import { HentSignalerKnap } from "./hent-signaler-knap";
+import { HentCvrAendringKnap } from "./hent-cvr-aendring-knap";
 import { BerigMedAiKnap } from "./berig-med-ai-knap";
 
 type Lead = {
@@ -350,49 +351,51 @@ export default async function LeadDetaljeSide({
                 Signaler <span className="text-tekst-daempet">— offentlige, virksomhedsniveau (Etape 8)</span>
               </h2>
               <p className="mb-2 text-xs text-tekst-daempet">
-                Hentet fra virksomhedens egen hjemmeside og en evt. fundet karriereside, med
-                robots.txt respekteret og maks. ét kald pr. domæne pr. 5 sekunder. Kun
-                "hjemmeside" og "jobopslag" er bygget - de øvrige fire tilladte kildetyper
-                kommer én ad gangen.
+                "Hjemmeside" og "jobopslag" hentes fra virksomhedens egen hjemmeside og en evt.
+                fundet karriereside, med robots.txt respekteret og maks. ét kald pr. domæne pr.
+                5 sekunder. "CVR-ændring" hentes fra Erhvervsstyrelsens CVR-forbindelse
+                (samme adgang som Etape 11's import). "Regnskab" og "presse" er ikke bygget endnu.
               </p>
-              {!lead.website && (
-                <p className="text-sm text-tekst-daempet">
-                  Dette lead har ingen registreret hjemmeside - intet at hente signaler fra.
-                </p>
-              )}
-              {lead.website && (
-                <div className="flex flex-col gap-3">
-                  {(signaler ?? []).length === 0 && (
-                    <p className="text-sm text-tekst-daempet">Ingen signaler hentet endnu.</p>
+              <div className="flex flex-col gap-3">
+                {(signaler ?? []).length === 0 && (
+                  <p className="text-sm text-tekst-daempet">Ingen signaler hentet endnu.</p>
+                )}
+                {(signaler ?? []).map((s) => {
+                  const gammelt = erSignalGammelt(new Date(s.hentet_dato));
+                  return (
+                    <div
+                      key={s.id}
+                      className={
+                        gammelt
+                          ? "rounded-lg border border-kant bg-flade p-3 opacity-50"
+                          : "rounded-lg border border-kant bg-flade p-3"
+                      }
+                    >
+                      <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-tekst-daempet">
+                        {SIGNAL_TYPE_LABEL[s.type] ?? s.type}
+                        {gammelt && <span>— over 6 måneder gammelt</span>}
+                      </p>
+                      <p className="mt-1 whitespace-pre-line text-sm text-tekst">{s.vaerdi ?? "(ingen værdi)"}</p>
+                      <p className="mt-1 text-xs text-tekst-daempet">
+                        <a href={s.kilde_url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                          {s.kilde_url}
+                        </a>{" "}
+                        · hentet {new Date(s.hentet_dato).toLocaleString("da-DK")}
+                      </p>
+                    </div>
+                  );
+                })}
+                <div className="flex flex-wrap gap-3">
+                  {lead.website ? (
+                    <HentSignalerKnap leadId={lead.id} />
+                  ) : (
+                    <p className="text-sm text-tekst-daempet">
+                      Ingen registreret hjemmeside - hjemmeside/jobopslag kan ikke hentes.
+                    </p>
                   )}
-                  {(signaler ?? []).map((s) => {
-                    const gammelt = erSignalGammelt(new Date(s.hentet_dato));
-                    return (
-                      <div
-                        key={s.id}
-                        className={
-                          gammelt
-                            ? "rounded-lg border border-kant bg-flade p-3 opacity-50"
-                            : "rounded-lg border border-kant bg-flade p-3"
-                        }
-                      >
-                        <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-tekst-daempet">
-                          {SIGNAL_TYPE_LABEL[s.type] ?? s.type}
-                          {gammelt && <span>— over 6 måneder gammelt</span>}
-                        </p>
-                        <p className="mt-1 text-sm text-tekst">{s.vaerdi ?? "(ingen værdi)"}</p>
-                        <p className="mt-1 text-xs text-tekst-daempet">
-                          <a href={s.kilde_url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
-                            {s.kilde_url}
-                          </a>{" "}
-                          · hentet {new Date(s.hentet_dato).toLocaleString("da-DK")}
-                        </p>
-                      </div>
-                    );
-                  })}
-                  <HentSignalerKnap leadId={lead.id} />
+                  <HentCvrAendringKnap leadId={lead.id} />
                 </div>
-              )}
+              </div>
             </section>
 
             <section>

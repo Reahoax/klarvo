@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 import { hentSignalerForLead, type EnkeltSignalResultat } from "@/lib/signaler/hentSignaler.ts";
+import { hentCvrAendringForLead } from "@/lib/signaler/hentCvrAendring.ts";
 import { berigLead } from "@/lib/ai/berig.ts";
 
 // Stadier der kun må sættes af den dedikerede forretningslogik (godkendLead,
@@ -132,6 +133,31 @@ export async function hentLeadSignaler(
     website: formaterEnkeltResultat(resultat.website),
     jobopslag: formaterEnkeltResultat(resultat.jobopslag),
   };
+}
+
+// Etape 8 (Spec.md "4B. OSINT", kildetypen "cvr_aendring") - egen knap,
+// adskilt fra hentLeadSignaler ovenfor, da denne kilde ikke deler
+// robots.txt/rate-limit-slot med leadets egen hjemmeside (den bruger
+// Erhvervsstyrelsens CVR-forbindelse, se lib/signaler/hentCvrAendring.ts).
+export async function hentCvrAendring(
+  _forrigeState: { fejl?: string; besked?: string } | null,
+  formData: FormData
+): Promise<{ fejl?: string; besked?: string }> {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return { fejl: "Mangler lead-id." };
+
+  const supabase = await opretServerKlient();
+  const { data: lead } = await supabase.from("leads").select("cvr_nummer").eq("id", leadId).single();
+  if (!lead?.cvr_nummer) {
+    return { fejl: "Dette lead har intet CVR-nummer." };
+  }
+
+  const resultat = await hentCvrAendringForLead(supabase, leadId, lead.cvr_nummer);
+
+  revalidatePath(`/leads/${leadId}`);
+
+  if (!resultat.ok) return { fejl: resultat.besked };
+  return { besked: resultat.genbrugtFraCache ? "Genbruger gemt signal (under 30 dage gammelt)." : "Hentet." };
 }
 
 // Etape 5 (Spec.md "4" og "4C") - manuel udløsning pr. lead, samme mønster
