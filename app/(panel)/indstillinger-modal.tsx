@@ -10,6 +10,7 @@ import {
   gemCvrForbindelse,
   afproevCvrForbindelse,
   fjernCvrForbindelse,
+  opdaterOsintKontaktEmail,
 } from "./indstillinger-actions";
 import { TemaVaelger } from "./tema-vaelger";
 import { opretBrowserKlient } from "@/lib/supabase/client";
@@ -23,6 +24,7 @@ type Konfiguration = {
   ringetid_fra: string;
   ringetid_til: string;
   ringetid_ugedage: number[];
+  osint_kontakt_email: string | null;
 } | null;
 
 const UGEDAGE = [
@@ -135,7 +137,7 @@ export function IndstillingerModal({
               <ForretningsreglerSektion konfiguration={konfiguration} />
             )}
             {sektion === "integrationer" && erEjer && (
-              <IntegrationerSektion cvrForbindelse={cvrForbindelse} />
+              <IntegrationerSektion cvrForbindelse={cvrForbindelse} konfiguration={konfiguration} />
             )}
           </div>
         </div>
@@ -540,8 +542,15 @@ function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfigurat
 // Selve forbindelsen kører 24/7 i backend'en, uafhængigt af om nogen er
 // logget ind - gemmes den én gang, kan et senere datatræk (Etape 11) bruge
 // den når som helst.
-function IntegrationerSektion({ cvrForbindelse }: { cvrForbindelse: CvrForbindelse }) {
+function IntegrationerSektion({
+  cvrForbindelse,
+  konfiguration,
+}: {
+  cvrForbindelse: CvrForbindelse;
+  konfiguration: Konfiguration;
+}) {
   const [gemState, gemAction, gemPending] = useActionState(gemCvrForbindelse, null);
+  const [emailState, emailAction, emailPending] = useActionState(opdaterOsintKontaktEmail, null);
   const [testPending, setTestPending] = useState(false);
   const [testResultat, setTestResultat] = useState<{ ok: boolean; besked: string } | null>(null);
   const [fjernPending, setFjernPending] = useState(false);
@@ -692,6 +701,37 @@ function IntegrationerSektion({ cvrForbindelse }: { cvrForbindelse: CvrForbindel
           </div>
         </form>
       )}
+
+      <h2 className="mb-1 mt-6 text-sm font-semibold text-tekst">OSINT-signaler</h2>
+      <p className="mb-4 text-sm text-tekst-daempet">
+        Når Klarvo henter offentlige signaler fra en virksomheds egen hjemmeside (Etape 8),
+        identificerer den sig ærligt med en kontakt-e-mail i forespørgslen — så en sideejer altid
+        kan se hvem der spurgte. Uden en adresse her henter systemet ingenting.
+      </p>
+      <form
+        action={emailAction}
+        className="flex flex-col gap-3 rounded-lg border border-kant bg-flade p-4"
+      >
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-tekst-daempet">Kontakt-e-mail</span>
+          <input
+            type="email"
+            name="osint_kontakt_email"
+            defaultValue={konfiguration?.osint_kontakt_email ?? ""}
+            placeholder="fx hello@jeresfirma.dk"
+            className="rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none transition-colors focus-visible:border-accent"
+          />
+        </label>
+        {emailState?.fejl && <p className="text-xs text-spaerret">{emailState.fejl}</p>}
+        {emailState?.ok && <p className="text-xs text-godkendt">Gemt.</p>}
+        <button
+          type="submit"
+          disabled={emailPending}
+          className="w-fit rounded-md border border-kant px-3 py-1.5 text-sm text-tekst-daempet transition-colors hover:border-accent hover:text-tekst disabled:opacity-60"
+        >
+          {emailPending ? "Gemmer…" : "Gem"}
+        </button>
+      </form>
     </div>
   );
 }

@@ -191,6 +191,46 @@ export async function fjernCvrForbindelse(): Promise<{ fejl?: string; ok?: boole
   return { ok: true };
 }
 
+// Etape 8 (Spec.md "4B. OSINT") - "identificér jer med en ærlig User-Agent
+// med kontakt-e-mail". Brugeren bad eksplicit om at kunne tilføje adressen
+// senere via en indstilling, i stedet for at Claude gætter eller hardcoder
+// en (2026-08-26) - uden en adresse her nægter lib/signaler/hentSignaler.ts
+// helt at hente noget.
+export async function opdaterOsintKontaktEmail(
+  _forrigeState: { fejl?: string; ok?: boolean } | null,
+  formData: FormData
+): Promise<{ fejl?: string; ok?: boolean }> {
+  const supabase = await opretServerKlient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { fejl: "Ikke logget ind." };
+
+  const { data: profil } = await supabase
+    .from("profiler")
+    .select("rolle")
+    .eq("id", user.id)
+    .single();
+  if (profil?.rolle !== "ejer") {
+    return { fejl: "Kun ejere kan ændre kontakt-e-mailen." };
+  }
+
+  const email = String(formData.get("osint_kontakt_email") ?? "").trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { fejl: "Det ligner ikke en gyldig e-mailadresse." };
+  }
+
+  const { error } = await supabase
+    .from("konfiguration")
+    .update({ osint_kontakt_email: email || null })
+    .eq("id", true);
+
+  if (error) return { fejl: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 const splitListe = (vaerdi: FormDataEntryValue | null) =>
   String(vaerdi ?? "")
     .split(",")

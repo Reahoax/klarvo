@@ -11,6 +11,7 @@ type Konfiguration = {
   ringetid_fra: string;
   ringetid_til: string;
   ringetid_ugedage: number[];
+  osint_kontakt_email: string | null;
 } | null;
 
 type CvrForbindelse = {

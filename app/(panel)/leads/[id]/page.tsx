@@ -10,12 +10,15 @@ import {
   Camera,
   Calculator,
   Handshake,
+  Radar,
 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 import { beregnSnapshotDiff, SNAPSHOT_FELT_LABEL, type SnapshotData } from "@/lib/leads/snapshots.ts";
+import { erSignalGammelt } from "@/lib/signaler/tidsregler.ts";
 import { godkendLead, opdaterPipelineStatus } from "./actions";
 import { TildelKundeForm } from "./tildel-kunde-form";
+import { HentSignalerKnap } from "./hent-signaler-knap";
 
 type Lead = {
   id: string;
@@ -64,6 +67,23 @@ type LogRaekke = {
   felt: string;
   gammel_vaerdi: unknown;
   ny_vaerdi: unknown;
+};
+
+type SignalRaekke = {
+  id: string;
+  type: string;
+  vaerdi: string | null;
+  kilde_url: string;
+  hentet_dato: string;
+};
+
+const SIGNAL_TYPE_LABEL: Record<string, string> = {
+  website: "Hjemmeside",
+  jobopslag: "Jobopslag",
+  regnskab: "Regnskab",
+  cvr_aendring: "CVR-ændring",
+  presse: "Presse",
+  anmeldelse: "Anmeldelse",
 };
 
 type SnapshotRaekke = {
@@ -132,6 +152,13 @@ export default async function LeadDetaljeSide({
     .eq("lead_id", id)
     .order("sket", { ascending: false })
     .returns<LogRaekke[]>();
+
+  const { data: signaler } = await supabase
+    .from("signaler")
+    .select("id, type, vaerdi, kilde_url, hentet_dato")
+    .eq("lead_id", id)
+    .order("hentet_dato", { ascending: false })
+    .returns<SignalRaekke[]>();
 
   const { data: snapshots } = await supabase
     .from("lead_snapshots")
@@ -305,6 +332,56 @@ export default async function LeadDetaljeSide({
                 <Felt label="AI-hypotese" vaerdi={lead.ai_hypotese ?? "Ikke genereret endnu"} />
                 <Felt label="AI-score" vaerdi={lead.ai_score} tal />
               </div>
+            </section>
+
+            <section>
+              <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+                <Radar className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+                Signaler <span className="text-tekst-daempet">— offentlige, virksomhedsniveau (Etape 8)</span>
+              </h2>
+              <p className="mb-2 text-xs text-tekst-daempet">
+                Hentet fra virksomhedens egen hjemmeside, med robots.txt respekteret og maks. ét
+                kald pr. domæne pr. 5 sekunder. Kun "hjemmeside" er bygget indtil videre - flere
+                kildetyper (jobopslag m.fl.) kommer én ad gangen.
+              </p>
+              {!lead.website && (
+                <p className="text-sm text-tekst-daempet">
+                  Dette lead har ingen registreret hjemmeside - intet at hente signaler fra.
+                </p>
+              )}
+              {lead.website && (
+                <div className="flex flex-col gap-3">
+                  {(signaler ?? []).length === 0 && (
+                    <p className="text-sm text-tekst-daempet">Ingen signaler hentet endnu.</p>
+                  )}
+                  {(signaler ?? []).map((s) => {
+                    const gammelt = erSignalGammelt(new Date(s.hentet_dato));
+                    return (
+                      <div
+                        key={s.id}
+                        className={
+                          gammelt
+                            ? "rounded-lg border border-kant bg-flade p-3 opacity-50"
+                            : "rounded-lg border border-kant bg-flade p-3"
+                        }
+                      >
+                        <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-tekst-daempet">
+                          {SIGNAL_TYPE_LABEL[s.type] ?? s.type}
+                          {gammelt && <span>— over 6 måneder gammelt</span>}
+                        </p>
+                        <p className="mt-1 text-sm text-tekst">{s.vaerdi ?? "(ingen værdi)"}</p>
+                        <p className="mt-1 text-xs text-tekst-daempet">
+                          <a href={s.kilde_url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                            {s.kilde_url}
+                          </a>{" "}
+                          · hentet {new Date(s.hentet_dato).toLocaleString("da-DK")}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  <HentSignalerKnap leadId={lead.id} />
+                </div>
+              )}
             </section>
 
             <section>

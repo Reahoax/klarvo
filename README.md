@@ -60,6 +60,30 @@ API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
 bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
 "Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
+**Sidste session, del 6 (2026-08-26):** Etape 8 — OSINT-signaler, fundamentet
+plus første kildetype ("website"). Brugeren bad om at gå videre med agendaen
+og valgte selv Etape 8 via et spørgsmål om hvilken del af Spec.md der skulle
+bygges næste. Fulgte specens egen rækkefølge bogstaveligt: "Byg rate limiting
+og cache FØRST, hentning bagefter" - se `lib/signaler/` for alle de rene,
+testede byggeklodser (robots.txt-fortolker, domæne-udtrækning, HTML-titel/
+meta-udtrækning, tidsregler for cache/rate-limit) og `hentSignaler.ts` for
+selve orkestreringen. **Kontakt-e-mailen i User-Agent'en** (et hårdt krav i
+specen - "identificér jer med en ærlig User-Agent med kontakt-e-mail") blev
+bevidst IKKE hardcodet eller gættet: brugeren bad eksplicit om en indstilling
+til at tilføje den senere i stedet, se Indstillinger → Integrationer →
+"OSINT-signaler". Hentning nægter helt at køre, indtil feltet er udfyldt.
+"Hent signaler" er en manuel, pr.-lead-knap på leaddetaljer (ikke et
+baggrundsjob endnu) - en bevidst forsigtig start, givet at det er den første
+funktion i appen, der henter fra vilkårlige tredjeparts-hjemmesider. Testet
+ende-til-ende mod `example.com` (IANAs reserverede testdomæne) i stedet for
+en rigtig kundes hjemmeside: bekræftede at email-spærringen blokerer korrekt
+uden en gemt adresse, at et rigtigt kald henter og gemmer titel+beskrivelse
+korrekt, at et genkald inden for 30 dage genbruger cachen uden at ramme
+netværket igen, og at en fejlet hentning (404 testet direkte) hverken gemmer
+et tomt signal eller crasher. Kun "website" er bygget - resten af de seks
+tilladte kildetyper (jobopslag, regnskab, cvr_aendring, presse, anmeldelse)
+afventer, jf. specens egen "én kildetype ad gangen".
+
 **Sidste session, del 5 (2026-08-26):** Paginering af Leads-tabellen. Brugeren
 bad om at "leads'ne skal være på sider i stedet for en lang liste", og
 efterfølgende om selv at kunne justere antal pr. side i filterpanelet -
@@ -284,7 +308,8 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
 | 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
 | 7C — ICP-analyse og segmenter | Delvist bygget (2026-08-24): **segmenter** er på plads — navngivne ICP'er pr. kunde (`segmenter`-tabellen, samme kriterie-form som `kunder.icp`), med statistik pr. segment (leads tilknyttet, ringet, kontaktrate, mødrate - se `lib/segmenter/statistik.ts`) og manuel tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment"). **ICP-analysen** (bagudrettet: upload liste over bedste kunder → CVR-opslag → statistisk udkast til ICP) er ikke bygget - brugeren valgte eksplicit at starte med segmenter først |
-| 8, 12 | Ikke bygget endnu |
+| 8 — OSINT-signaler | Delvist bygget (2026-08-26): fundamentet (rate limiting, robots.txt, 30-dages cache - se "Etape 8" nedenfor) plus den første kildetype, "website" (titel + meta-beskrivelse fra virksomhedens egen forside). Testet ende-til-ende mod example.com i produktion-lignende forhold: email-spærring, robots.txt-respekt, cache-genbrug og korrekt håndteret 404 blev alle bekræftet. Øvrige fem kildetyper (jobopslag, regnskab, cvr_aendring, presse, anmeldelse) er ikke bygget - "én kildetype ad gangen" |
+| 12 | Ikke bygget endnu |
 | 9 — Matching | Regelbaseret del bygget (2026-08-24): `/matching` viser ukoblede, kontaktbare leads matchet mod aktive kunders ICP (branchekode, ansattal, geografi, virksomhedsform, ikke spærret - se `lib/matching/score.ts`), med begrundelse i klartekst og Tildel/Afvis. Systemet tildeler aldrig selv. Signalbaseret vægtning (jobopslag, vækst m.v.) afventer OSINT-indsamling (Etape 8), ikke bygget - matches er derfor ja/nej, ikke en gradueret score |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
 
@@ -568,6 +593,82 @@ Hobby-plan-loftet; opgradér Vercel-planen hvis hyppigere import ønskes — fle
 kørsler pr. døgn ville også lade hele registret gennemløbes hurtigere end i
 dag).
 
+## Etape 8 — OSINT-signaler
+
+Spec.md afsnit "4B. OSINT" — offentlige signaler om **virksomheder**, aldrig om
+enkeltpersoner ud over navn/titel/arbejdstelefon. Bygget 2026-08-26, fundament
+plus første kildetype ("website"), i den rækkefølge specen selv foreskriver:
+rate limiting og cache først, hentning bagefter.
+
+**Hvor login/kontakt-info gemmes:** `konfiguration.osint_kontakt_email` —
+redigeres i Indstillinger → Integrationer → "OSINT-signaler" (kun `ejer`).
+**Ingen hentning sker overhovedet, før denne er udfyldt** — det er et hårdt
+krav i specen ("identificér jer med en ærlig User-Agent med kontakt-e-mail"),
+ikke en formalitet. Feltet er bevidst efterladt tomt fra starten — brugeren
+bad eksplicit om selv at kunne tilføje adressen senere i stedet for at Claude
+gættede eller hardcodede en.
+
+**`lib/signaler/`** — alle byggeklodserne, hver en ren, testet funktion:
+
+- **`domaene.ts`** — udtrækker domænet fra en lead's `website`-felt (fjerner
+  `www.`, lowercaser).
+- **`robots.ts`** — en simpel, standardnær robots.txt-fortolker (kun
+  User-agent/Allow/Disallow forstås; længste sti-præfiks vinder, samme
+  konvention som Googles egen parser). Ingen robots.txt fundet = tilladt,
+  samme fallback som selve protokollen foreskriver.
+- **`uddrag.ts`** — udtrækker `<title>` og meta-beskrivelsen fra HTML-svaret
+  med regex, ikke en fuld HTML-parser (afkorter til 500 tegn).
+- **`tidsregler.ts`** — de tre tidsgrænser fra specen som konstanter:
+  `MIN_MILLISEKUNDER_MELLEM_KALD` (5 sek. pr. domæne), `CACHE_DAGE` (30 dage
+  — "hent aldrig det samme to gange"), `SIGNAL_GAMMELT_DAGE` (180 dage/6
+  måneder — vises nedtonet i UI'et).
+- **`hentSignaler.ts`** — selve orkestreringen (`hentWebsiteSignal`). Deler
+  logik med en eventuel fremtidig baggrundshentning, ligesom
+  `lib/cvr/importer.ts` deles mellem cron-routen og manuelle kald.
+
+**Rækkefølgen i `hentWebsiteSignal` er bevidst:**
+1. Tjek `osint_kontakt_email` er sat — ellers afvis med det samme.
+2. Tjek cachen (et `signaler`-opslag på lead+type) — er der et signal under 30
+   dage gammelt, genbruges det uden noget netværkskald overhovedet.
+3. Tjek/lås rate limit — `signal_domaener`-tabellen (domæne → sidst hentet)
+   holder ét fælles tidsstempel pr. domæne, som **både** robots.txt-opslaget
+   og selve sidehentningen tæller som (bevidst forenkling: de to kald hænger
+   uløseligt sammen som én "operation" mod domænet, ikke to separate — ellers
+   ville hver hentning kræve en persisteret robots.txt-cache oveni, hvilket
+   er overkill for en manuel, ét-lead-ad-gangen-knap).
+4. Hent og fortolk robots.txt for domænet — afvis, hvis stien er forbudt.
+5. Hent selve siden (8 sek. timeout, svar afkortet til 2 MB), udtræk
+   titel+beskrivelse, gem som ét `signaler`-row (`type: "website"`, `vaegt: 1`
+   — ikke brugt til noget endnu, afventer signalbaseret vægtning i Matching).
+
+**Fejler noget undervejs** (netværksfejl, ikke-200-status, robots.txt
+forbyder, rate limit ikke udløbet endnu): intet signal gemmes, en klar
+begrundelse vises i UI'et, og rate-limit-slotten er allerede låst — et
+gentaget klik venter derfor naturligt, i stedet for at give mulighed for en
+retry-storm.
+
+**UI:** "Signaler"-sektionen på leaddetaljer (`leads/[id]/page.tsx`) viser
+alle gemte signaler for leadet (nedtonet hvis over 6 måneder gamle) plus en
+"Hent signaler"-knap (`hent-signaler-knap.tsx`, kun synlig hvis leadet har en
+`website`-værdi). Bevidst en **manuel, pr.-lead-knap**, ikke et automatisk
+baggrundsjob — første gang appen henter fra vilkårlige tredjeparts-
+hjemmesider, så en forsigtig, menneskestyret start blev valgt frem for straks
+at bygge en nattelig masse-crawl af alle leads' hjemmesider.
+
+**Testet ende-til-ende (2026-08-26)** mod `example.com` (IANAs officielt
+reserverede testdomæne, ikke en rigtig kundes hjemmeside) i stedet for et
+rigtigt lead: bekræftede at manglende kontakt-e-mail blokerer korrekt, at et
+rigtigt kald henter og gemmer "Example Domain" som titel, at et genkald
+inden for 30 dage rammer cachen og ikke netværket, og at en 404 hverken
+gemmer et tomt signal eller crasher siden.
+
+**Tilbageværende, ikke-hastende:** de øvrige fem tilladte kildetyper
+(jobopslag, regnskaber.virk.dk, CVR-historik, Google/Bing, Trustpilot) — jf.
+specens egen "én kildetype ad gangen". "Jobopslag" er den naturlige næste,
+men kræver først en strategi for at FINDE en karriereside ud fra vilkårlig
+HTML, hvilket er en selvstændig opgave. Signalbaseret vægtning i Matching
+(Etape 9) afventer at flere kildetyper findes at vægte imod.
+
 ## Teknisk stack
 
 - **Next.js (App Router) + TypeScript** — server-rendering, så følsomme kald
@@ -606,9 +707,12 @@ Ordino/
       bruger-menu.tsx           Klikbar profil nederst i sidebaren (popup), åbner
                                 IndstillingerModal ved klik på "Indstillinger"
       indstillinger-modal.tsx  Pop-op med intern sidebar (Konto/Udseende/
-                                Forretningsregler - sidstnævnte kun `ejer`)
+                                Forretningsregler/Integrationer - de to sidste kun `ejer`).
+                                Integrationer rummer CVR-forbindelsen og OSINT-signalers
+                                kontakt-e-mail (Etape 8)
       indstillinger-actions.ts Server actions: navn, adgangskode, forretningsregler
-                                (inkl. ringetidsvindue)
+                                (inkl. ringetidsvindue), CVR-forbindelse,
+                                opdaterOsintKontaktEmail (Etape 8)
       brugertema-effekt.tsx    Sætter baggrundsbillede på <body> (kan ikke gøres i
                                 TEMA_SCRIPT, da <body> ikke findes når det kører)
       tema-vaelger.tsx          Mørk/Lys/Brugerdefineret - hele tema-editoren
@@ -629,12 +733,15 @@ Ordino/
         [id]/
           page.tsx                 Detaljevisning: alle felter + activity_log-historik +
                                     Snapshot-historik (Etape 7B, diffet mod forrige import) +
-                                    "Kunde og segment" (Etape 7C, manuel tildeling)
+                                    "Kunde og segment" (Etape 7C) + "Signaler" (Etape 8)
           actions.ts                Server actions: skift pipeline-stadie, godkend lead,
-                                    tildelKunde (kunde_id + lead_segmenter, Etape 7C)
+                                    tildelKunde (kunde_id + lead_segmenter, Etape 7C),
+                                    hentLeadSignaler (Etape 8, kalder lib/signaler/hentSignaler.ts)
           tildel-kunde-form.tsx     Klientkomponent: filtrerer segment-checkbokse til den
                                     valgte kundes egne (se README "Etablerede mønstre" om
                                     key-mønsteret, der forhindrer stale visning efter Gem)
+          hent-signaler-knap.tsx    Klientkomponent: "Hent signaler"-knappen, viser
+                                    resultat/fejl fra hentLeadSignaler via useActionState
         importer/
           page.tsx                 Ren statusside for den automatiske CVR-import
                                     (kun ejer) - ingen upload, ingen knap; se
@@ -692,6 +799,18 @@ Ordino/
       score.ts                      Etape 9: regelbaserede hårde kriterier (branchekode,
                                     ansattal, geografi, virksomhedsform, ikke spærret) -
                                     ren funktion + tests, case-insensitiv virksomhedsform
+    signaler/
+      domaene.ts                    Etape 8: udtrækker domænet fra en URL - ren funktion + tests
+      robots.ts                      Etape 8: simpel robots.txt-fortolker (længste sti-
+                                    præfiks vinder) - ren funktion + tests
+      uddrag.ts                      Etape 8: udtrækker <title>/meta-beskrivelse fra HTML -
+                                    ren funktion + tests
+      tidsregler.ts                  Etape 8: rate limit (5 sek./domæne), cache (30 dage),
+                                    "gammelt signal" (6 mdr.) som konstanter - rene
+                                    funktioner + tests
+      hentSignaler.ts                Etape 8: selve orkestreringen (hentWebsiteSignal) -
+                                    IO, derfor ikke unit-testet, men bygget udelukkende af
+                                    de testede byggeklodser ovenfor
     supabase/
       client.ts                  Supabase-klient til browseren
       server.ts                  Supabase-klient til server components/actions
