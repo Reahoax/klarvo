@@ -60,6 +60,20 @@ API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
 bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
 "Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
+**Sidste session, del 7 (2026-08-26):** Etape 8 — anden kildetype,
+"jobopslag". Brugeren bad om at "blive ved" lige efter "website"
+(kildetype 1, del 6 nedenfor) - naturlig fortsættelse af "én kildetype ad
+gangen". Løsningen: `lib/signaler/karriere.ts`s `findKarriereLink` leder i
+forsidens allerede-hentede HTML efter et link, der matcher danske/engelske
+job-nøgleord (i selve URL'en giver dobbelt point, i linkteksten enkelt
+point - højeste score vinder). `hentSignaler.ts` blev omskrevet fra
+`hentWebsiteSignal` til `hentSignalerForLead`, der henter **begge**
+kildetyper i ét kald og deler ét robots.txt-opslag + én rate-limit-slot pr.
+domæne (se "Etape 8" nedenfor for hvorfor). "Hent signaler"-knappen viser nu
+to linjer, én pr. kildetype. Testet mod example.com (som ikke har nogen
+karriereside) - bekræftede den korrekte "intet karriere-link fundet"-besked
+uden at gemme et tomt/opdigtet signal.
+
 **Sidste session, del 6 (2026-08-26):** Etape 8 — OSINT-signaler, fundamentet
 plus første kildetype ("website"). Brugeren bad om at gå videre med agendaen
 og valgte selv Etape 8 via et spørgsmål om hvilken del af Spec.md der skulle
@@ -308,7 +322,7 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
 | 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
 | 7C — ICP-analyse og segmenter | Delvist bygget (2026-08-24): **segmenter** er på plads — navngivne ICP'er pr. kunde (`segmenter`-tabellen, samme kriterie-form som `kunder.icp`), med statistik pr. segment (leads tilknyttet, ringet, kontaktrate, mødrate - se `lib/segmenter/statistik.ts`) og manuel tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment"). **ICP-analysen** (bagudrettet: upload liste over bedste kunder → CVR-opslag → statistisk udkast til ICP) er ikke bygget - brugeren valgte eksplicit at starte med segmenter først |
-| 8 — OSINT-signaler | Delvist bygget (2026-08-26): fundamentet (rate limiting, robots.txt, 30-dages cache - se "Etape 8" nedenfor) plus den første kildetype, "website" (titel + meta-beskrivelse fra virksomhedens egen forside). Testet ende-til-ende mod example.com i produktion-lignende forhold: email-spærring, robots.txt-respekt, cache-genbrug og korrekt håndteret 404 blev alle bekræftet. Øvrige fem kildetyper (jobopslag, regnskab, cvr_aendring, presse, anmeldelse) er ikke bygget - "én kildetype ad gangen" |
+| 8 — OSINT-signaler | Delvist bygget (2026-08-26): fundamentet (rate limiting, robots.txt, 30-dages cache) plus to kildetyper - "website" (titel + meta-beskrivelse fra forsiden) og "jobopslag" (finder et karriere-/jobside-link i forsidens HTML ud fra nøgleord, henter den samme måde). De to deler ét robots.txt-opslag og én rate-limit-slot pr. domæne. Testet ende-til-ende mod example.com: email-spærring, robots.txt-respekt, cache-genbrug, korrekt håndteret 404 og korrekt "intet karriere-link fundet" blev alle bekræftet. Øvrige fire kildetyper (regnskab, cvr_aendring, presse, anmeldelse) er ikke bygget - "én kildetype ad gangen" |
 | 12 | Ikke bygget endnu |
 | 9 — Matching | Regelbaseret del bygget (2026-08-24): `/matching` viser ukoblede, kontaktbare leads matchet mod aktive kunders ICP (branchekode, ansattal, geografi, virksomhedsform, ikke spærret - se `lib/matching/score.ts`), med begrundelse i klartekst og Tildel/Afvis. Systemet tildeler aldrig selv. Signalbaseret vægtning (jobopslag, vækst m.v.) afventer OSINT-indsamling (Etape 8), ikke bygget - matches er derfor ja/nej, ikke en gradueret score |
 | 10 — Møder og saldo | Bygget (2026-08-14): "Møde booket" i Ringeliste åbner en bookingmodal (dato/tid, mødeform, deltager, kontekstnote) → opretter en `moeder`-række ("planlagt") og viser en genereret bekræftelsestekst til at kopiere og sende manuelt (systemet sender aldrig selv noget) — se `lib/moeder/bekraeftelsestekst.ts`. Ny side `/moeder`: fire kvalitetstjek-flueben pr. møde (kun alle fire + status "afholdt" tæller som leveret/fakturerbart, jf. `kunde_saldo`-viewet), statusskift (afholdt/afvist af kunde + begrundelse/no-show/aflyst), og en klient-side `window.confirm()` hvis et møde ville sende kundens saldo i minus. Saldo-siden af skærmbillede H fandtes allerede på Økonomi-siden (se "Udover Spec.md") |
@@ -597,8 +611,8 @@ dag).
 
 Spec.md afsnit "4B. OSINT" — offentlige signaler om **virksomheder**, aldrig om
 enkeltpersoner ud over navn/titel/arbejdstelefon. Bygget 2026-08-26, fundament
-plus første kildetype ("website"), i den rækkefølge specen selv foreskriver:
-rate limiting og cache først, hentning bagefter.
+plus to kildetyper ("website" og "jobopslag"), i den rækkefølge specen selv
+foreskriver: rate limiting og cache først, hentning bagefter.
 
 **Hvor login/kontakt-info gemmes:** `konfiguration.osint_kontakt_email` —
 redigeres i Indstillinger → Integrationer → "OSINT-signaler" (kun `ejer`).
@@ -617,57 +631,82 @@ gættede eller hardcodede en.
   konvention som Googles egen parser). Ingen robots.txt fundet = tilladt,
   samme fallback som selve protokollen foreskriver.
 - **`uddrag.ts`** — udtrækker `<title>` og meta-beskrivelsen fra HTML-svaret
-  med regex, ikke en fuld HTML-parser (afkorter til 500 tegn).
+  med regex, ikke en fuld HTML-parser (afkorter til 500 tegn). Bruges til
+  begge kildetyper.
+- **`karriere.ts`** — `findKarriereLink` leder i en forsides HTML efter et
+  link, der matcher danske/engelske job-nøgleord ("job", "karriere",
+  "career", "stilling" m.fl.) — dobbelt point hvis nøgleordet er i selve
+  URL'en, enkelt point hvis det kun er i linkteksten. Højeste score vinder;
+  intet match giver `null`. Bevidst regex-heuristik, ikke en sitemap-crawl —
+  vi kender kun forsiden på forhånd.
 - **`tidsregler.ts`** — de tre tidsgrænser fra specen som konstanter:
   `MIN_MILLISEKUNDER_MELLEM_KALD` (5 sek. pr. domæne), `CACHE_DAGE` (30 dage
   — "hent aldrig det samme to gange"), `SIGNAL_GAMMELT_DAGE` (180 dage/6
   måneder — vises nedtonet i UI'et).
-- **`hentSignaler.ts`** — selve orkestreringen (`hentWebsiteSignal`). Deler
+- **`hentSignaler.ts`** — selve orkestreringen (`hentSignalerForLead`). Deler
   logik med en eventuel fremtidig baggrundshentning, ligesom
   `lib/cvr/importer.ts` deles mellem cron-routen og manuelle kald.
 
-**Rækkefølgen i `hentWebsiteSignal` er bevidst:**
-1. Tjek `osint_kontakt_email` er sat — ellers afvis med det samme.
-2. Tjek cachen (et `signaler`-opslag på lead+type) — er der et signal under 30
-   dage gammelt, genbruges det uden noget netværkskald overhovedet.
+**Rækkefølgen i `hentSignalerForLead` er bevidst:**
+1. Tjek `osint_kontakt_email` er sat — ellers afvis begge kildetyper med det samme.
+2. Tjek cachen for **hver** kildetype for sig (to separate `signaler`-opslag
+   på lead+type) — er begge under 30 dage gamle, springes hele operationen
+   over uden noget netværkskald overhovedet.
 3. Tjek/lås rate limit — `signal_domaener`-tabellen (domæne → sidst hentet)
-   holder ét fælles tidsstempel pr. domæne, som **både** robots.txt-opslaget
-   og selve sidehentningen tæller som (bevidst forenkling: de to kald hænger
-   uløseligt sammen som én "operation" mod domænet, ikke to separate — ellers
-   ville hver hentning kræve en persisteret robots.txt-cache oveni, hvilket
-   er overkill for en manuel, ét-lead-ad-gangen-knap).
-4. Hent og fortolk robots.txt for domænet — afvis, hvis stien er forbudt.
-5. Hent selve siden (8 sek. timeout, svar afkortet til 2 MB), udtræk
-   titel+beskrivelse, gem som ét `signaler`-row (`type: "website"`, `vaegt: 1`
-   — ikke brugt til noget endnu, afventer signalbaseret vægtning i Matching).
+   holder ÉT fælles tidsstempel pr. domæne, som robots.txt-opslaget,
+   forsidehentningen OG en eventuel karriereside-hentning alle tæller som
+   (bevidst forenkling: de kald hænger uløseligt sammen som én "operation"
+   mod domænet, ikke flere separate — ellers ville hver hentning kræve en
+   persisteret robots.txt-cache oveni, hvilket er overkill for en manuel,
+   ét-lead-ad-gangen-knap).
+4. Hent og fortolk robots.txt for domænet.
+5. Hent forsiden (8 sek. timeout, svar afkortet til 2 MB, afvist hvis
+   robots.txt forbyder stien), udtræk titel+beskrivelse, gem som `signaler`
+   (`type: "website"`).
+6. Led i forsidens HTML efter et karriere-/jobside-link
+   (`findKarriereLink`). Findes ét på **samme domæne**, og tillader
+   robots.txt det, hentes den siden samme måde og gemmes som `signaler`
+   (`type: "jobopslag"`). Findes intet link, gemmes intet - det er ikke en
+   fejl, bare et fravær af signal. `vaegt: 1` på begge typer — ikke brugt
+   til noget endnu, afventer signalbaseret vægtning i Matching.
 
 **Fejler noget undervejs** (netværksfejl, ikke-200-status, robots.txt
-forbyder, rate limit ikke udløbet endnu): intet signal gemmes, en klar
-begrundelse vises i UI'et, og rate-limit-slotten er allerede låst — et
-gentaget klik venter derfor naturligt, i stedet for at give mulighed for en
+forbyder, rate limit ikke udløbet endnu, intet karriere-link fundet): intet
+signal gemmes for den pågældende kildetype, en klar begrundelse vises i
+UI'et pr. kildetype, og rate-limit-slotten er allerede låst — et gentaget
+klik venter derfor naturligt, i stedet for at give mulighed for en
 retry-storm.
 
 **UI:** "Signaler"-sektionen på leaddetaljer (`leads/[id]/page.tsx`) viser
 alle gemte signaler for leadet (nedtonet hvis over 6 måneder gamle) plus en
 "Hent signaler"-knap (`hent-signaler-knap.tsx`, kun synlig hvis leadet har en
-`website`-værdi). Bevidst en **manuel, pr.-lead-knap**, ikke et automatisk
-baggrundsjob — første gang appen henter fra vilkårlige tredjeparts-
-hjemmesider, så en forsigtig, menneskestyret start blev valgt frem for straks
-at bygge en nattelig masse-crawl af alle leads' hjemmesider.
+`website`-værdi), som viser ét resultat pr. kildetype efter klik. Bevidst en
+**manuel, pr.-lead-knap**, ikke et automatisk baggrundsjob — første gang
+appen henter fra vilkårlige tredjeparts-hjemmesider, så en forsigtig,
+menneskestyret start blev valgt frem for straks at bygge en nattelig
+masse-crawl af alle leads' hjemmesider.
 
 **Testet ende-til-ende (2026-08-26)** mod `example.com` (IANAs officielt
 reserverede testdomæne, ikke en rigtig kundes hjemmeside) i stedet for et
-rigtigt lead: bekræftede at manglende kontakt-e-mail blokerer korrekt, at et
-rigtigt kald henter og gemmer "Example Domain" som titel, at et genkald
-inden for 30 dage rammer cachen og ikke netværket, og at en 404 hverken
-gemmer et tomt signal eller crasher siden.
+rigtigt lead: bekræftede at manglende kontakt-e-mail blokerer begge
+kildetyper korrekt, at et rigtigt kald henter og gemmer "Example Domain" som
+website-titel, at et genkald inden for 30 dage rammer cachen og ikke
+netværket, at en 404 hverken gemmer et tomt signal eller crasher siden, og
+at "intet karriere-link fundet" rapporteres korrekt uden et opdigtet
+jobopslag-signal (example.com har naturligvis ingen karriereside).
 
-**Tilbageværende, ikke-hastende:** de øvrige fem tilladte kildetyper
-(jobopslag, regnskaber.virk.dk, CVR-historik, Google/Bing, Trustpilot) — jf.
-specens egen "én kildetype ad gangen". "Jobopslag" er den naturlige næste,
-men kræver først en strategi for at FINDE en karriereside ud fra vilkårlig
-HTML, hvilket er en selvstændig opgave. Signalbaseret vægtning i Matching
-(Etape 9) afventer at flere kildetyper findes at vægte imod.
+**Tilbageværende, ikke-hastende:** de øvrige fire tilladte kildetyper
+(regnskaber.virk.dk, CVR-historik, Google/Bing-søgeresultater, Trustpilot) —
+jf. specens egen "én kildetype ad gangen". Signalbaseret vægtning i Matching
+(Etape 9) afventer at flere kildetyper findes at vægte imod. **Google/Bing-
+søgeresultater kræver en beslutning, før de bygges:** direkte scraping af
+selve Googles/Bings søgeresultatsider er i strid med deres brugsvilkår (og
+uden for "Tilladte kilder — byg mod disse" i ånd, som forudsætter lovligt
+tilgængelige data) — den rigtige vej er en officiel søge-API (fx Bing Web
+Search API via Azure, eller Google Custom Search JSON API), som kræver at
+brugeren selv opretter en konto og en API-nøgle, ligesom CVR-adgangen og den
+kommende `ANTHROPIC_API_KEY`. Spørg brugeren hvilken tjeneste, før dette
+bygges.
 
 ## Teknisk stack
 
@@ -804,13 +843,17 @@ Ordino/
       robots.ts                      Etape 8: simpel robots.txt-fortolker (længste sti-
                                     præfiks vinder) - ren funktion + tests
       uddrag.ts                      Etape 8: udtrækker <title>/meta-beskrivelse fra HTML -
-                                    ren funktion + tests
+                                    ren funktion + tests, bruges af begge kildetyper
+      karriere.ts                    Etape 8: finder et karriere-/jobside-link i en forsides
+                                    HTML ud fra nøgleord (jobopslag-kildetypen) - ren
+                                    funktion + tests
       tidsregler.ts                  Etape 8: rate limit (5 sek./domæne), cache (30 dage),
                                     "gammelt signal" (6 mdr.) som konstanter - rene
                                     funktioner + tests
-      hentSignaler.ts                Etape 8: selve orkestreringen (hentWebsiteSignal) -
-                                    IO, derfor ikke unit-testet, men bygget udelukkende af
-                                    de testede byggeklodser ovenfor
+      hentSignaler.ts                Etape 8: selve orkestreringen (hentSignalerForLead,
+                                    henter website+jobopslag samlet) - IO, derfor ikke
+                                    unit-testet, men bygget udelukkende af de testede
+                                    byggeklodser ovenfor
     supabase/
       client.ts                  Supabase-klient til browseren
       server.ts                  Supabase-klient til server components/actions

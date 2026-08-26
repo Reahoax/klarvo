@@ -340,9 +340,10 @@ export default async function LeadDetaljeSide({
                 Signaler <span className="text-tekst-daempet">— offentlige, virksomhedsniveau (Etape 8)</span>
               </h2>
               <p className="mb-2 text-xs text-tekst-daempet">
-                Hentet fra virksomhedens egen hjemmeside, med robots.txt respekteret og maks. ét
-                kald pr. domæne pr. 5 sekunder. Kun "hjemmeside" er bygget indtil videre - flere
-                kildetyper (jobopslag m.fl.) kommer én ad gangen.
+                Hentet fra virksomhedens egen hjemmeside og en evt. fundet karriereside, med
+                robots.txt respekteret og maks. ét kald pr. domæne pr. 5 sekunder. Kun
+                "hjemmeside" og "jobopslag" er bygget - de øvrige fire tilladte kildetyper
+                kommer én ad gangen.
               </p>
               {!lead.website && (
                 <p className="text-sm text-tekst-daempet">

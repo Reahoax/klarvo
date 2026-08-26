@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
-import { hentWebsiteSignal } from "@/lib/signaler/hentSignaler.ts";
+import { hentSignalerForLead, type EnkeltSignalResultat } from "@/lib/signaler/hentSignaler.ts";
 
 // Stadier der kun må sættes af den dedikerede forretningslogik (godkendLead,
 // og fremover ringeliste-udfald) - ikke ved et frit klik her. Ellers kan et lead
@@ -94,14 +94,26 @@ export async function tildelKunde(formData: FormData) {
   if (kundeId) revalidatePath(`/kunder/${kundeId}`);
 }
 
-// Etape 8 (Spec.md "4B. OSINT") - starter med "website"-signaltypen. Selve
-// rate limiting/robots.txt/cache-logikken ligger i lib/signaler/hentSignaler.ts,
-// som er delt, så en fremtidig baggrundsjob (ligesom CVR-importens cron) kan
-// genbruge den uden at duplikere reglerne.
+// Etape 8 (Spec.md "4B. OSINT") - "website" og "jobopslag" hentes samlet i
+// ét kald (jobopslag-linket findes i forsidens HTML, se
+// lib/signaler/hentSignaler.ts for hvorfor de deler robots.txt-opslag og
+// rate-limit-slot). Selve rate limiting/robots.txt/cache-logikken er delt,
+// så en fremtidig baggrundsjob (ligesom CVR-importens cron) kan genbruge den
+// uden at duplikere reglerne.
+type KildeVisning = { ok: boolean; besked: string };
+
+function formaterEnkeltResultat(resultat: EnkeltSignalResultat): KildeVisning {
+  if (!resultat.ok) return { ok: false, besked: resultat.besked };
+  return {
+    ok: true,
+    besked: resultat.genbrugtFraCache ? "Genbruger gemt signal (under 30 dage gammelt)." : "Hentet.",
+  };
+}
+
 export async function hentLeadSignaler(
-  _forrigeState: { fejl?: string; ok?: boolean; besked?: string } | null,
+  _forrigeState: { fejl?: string; website?: KildeVisning; jobopslag?: KildeVisning } | null,
   formData: FormData
-): Promise<{ fejl?: string; ok?: boolean; besked?: string }> {
+): Promise<{ fejl?: string; website?: KildeVisning; jobopslag?: KildeVisning }> {
   const leadId = String(formData.get("leadId") ?? "");
   if (!leadId) return { fejl: "Mangler lead-id." };
 
@@ -111,15 +123,12 @@ export async function hentLeadSignaler(
     return { fejl: "Dette lead har ingen registreret hjemmeside at hente signaler fra." };
   }
 
-  const resultat = await hentWebsiteSignal(supabase, leadId, lead.website);
+  const resultat = await hentSignalerForLead(supabase, leadId, lead.website);
 
   revalidatePath(`/leads/${leadId}`);
 
-  if (!resultat.ok) return { fejl: resultat.besked };
   return {
-    ok: true,
-    besked: resultat.genbrugtFraCache
-      ? "Allerede hentet inden for de sidste 30 dage - genbruger det gemte signal."
-      : "Hentet.",
+    website: formaterEnkeltResultat(resultat.website),
+    jobopslag: formaterEnkeltResultat(resultat.jobopslag),
   };
 }

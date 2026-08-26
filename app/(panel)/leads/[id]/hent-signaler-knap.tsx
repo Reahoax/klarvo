@@ -17,7 +17,16 @@ export function HentSignalerKnap({ leadId }: { leadId: string }) {
         {pending ? "Henter…" : "Hent signaler"}
       </button>
       {state?.fejl && <p className="text-xs text-spaerret">{state.fejl}</p>}
-      {state?.ok && <p className="text-xs text-godkendt">{state.besked}</p>}
+      {state?.website && (
+        <p className={`text-xs ${state.website.ok ? "text-godkendt" : "text-spaerret"}`}>
+          Hjemmeside: {state.website.besked}
+        </p>
+      )}
+      {state?.jobopslag && (
+        <p className={`text-xs ${state.jobopslag.ok ? "text-godkendt" : "text-spaerret"}`}>
+          Jobopslag: {state.jobopslag.besked}
+        </p>
+      )}
     </form>
   );
 }
