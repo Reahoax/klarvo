@@ -58,7 +58,7 @@ export const navGrupper: NavGruppe[] = [
       // mødebooking-flowet (Ringeliste -> "Møde booket", kvalitetstjek,
       // mødestatus) er stadig ikke bygget (Etape 10).
       { bogstav: "H", navn: "Økonomi", href: "/okonomi", Ikon: Wallet },
-      { bogstav: "F", navn: "Rapport", href: null, Ikon: FileBarChart2 },
+      { bogstav: "F", navn: "Rapport", href: "/rapport", Ikon: FileBarChart2 },
     ],
   },
 ];

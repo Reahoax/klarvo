@@ -761,6 +761,72 @@ Spec.md forbyder). `presse` afventer eksplicit brugerens eget "skub ud til
 kunder"-tidspunkt. Signalbaseret vægtning i Matching (Etape 9) kan nu
 begynde med tre kildetyper at vægte imod, i stedet for kun to.
 
+**Proff.dk undersøgt som alternativ regnskabskilde (2026-08-26), også
+afvist:** brugeren spurgte eksplicit, om Proff kunne bruges i stedet.
+Proffs robots.txt er faktisk permissiv (kun navngivne AI-crawlere og et par
+andre bots er helt blokeret - almindelige virksomhedssider er ikke
+disallowed for en generisk bot). Men Proffs egne Brugsvilkår
+(proff.dk/info/brugsvilkaar/, læst i fuld tekst) forbyder det alligevel:
+"Uautoriseret kopiering, spredning eller offentlig fremførelse af Proffs
+tjenester eller dele heraf er i strid med ophavsretsloven." Ingen
+undtagelse for automatiseret/programmatisk læsning af enkelte datapunkter.
+Proff har et officielt, betalt API-produkt (proff.dk/info/api/) - det er
+den rigtige vej, hvis regnskabsdata fra Proff nogensinde skal bruges, men
+kræver at brugeren selv opretter og betaler for en aftale, ligesom
+CVR-adgangen. Ikke bygget, og spørg ikke om det igen medmindre brugeren
+selv nævner en Proff-aftale.
+
+## Etape 10B — Rapport
+
+Spec.md afsnit "F. Rapport" og "Målinger der faktisk betyder noget". Bygget
+2026-08-26. Ny side /rapport (aktiveret i sidebar-nav, var tidligere
+href: null).
+
+lib/rapport/ - rene, testede funktioner:
+
+- funnel.ts - beregnFunnel: researchet til kvalificeret til ringet til
+  kontakt opnået til møder booket, med konverteringsrate mellem hvert trin
+  (afrundet til én decimal, null frem for 0%/NaN når nævneren er 0).
+  "Researchet" er bevidst IKKE periode-afgrænset (leads har ingen egen
+  "tildelt dato"-kolonne) - det er et øjebliksbillede af leads aktuelt
+  tilknyttet kunden, mens ringet/kontakt/møder ER periode-afgrænset via
+  aktiviteter.oprettet/moeder.oprettet, som har rigtige tidsstempler.
+- analyser.ts - analyserAfvisningsgrunde og analyserKontaktTitel, svarer på
+  spørgsmål 2 ("hvor mange møder afvises, og hvorfor") og 3 ("hvilken
+  titel siger oftest ja") fra "Målinger der faktisk betyder noget". Begge
+  regnes på tværs af alle kunder for perioden, ikke pr. kunde - spørgsmålene
+  er formuleret som samlede driftsmål.
+- csv.ts - tilCsv: generisk RFC 4180-CSV (escaper komma/citationstegn/
+  linjeskift, \r\n-linjeskift for Excel-kompatibilitet).
+- hentRapportData.ts - selve databaseopslaget (kunder, leads, aktiviteter,
+  moeder), fordeler pr. kunde og kalder de rene funktioner ovenfor.
+
+CSV-eksport: app/api/rapport/eksport/route.ts - beskyttet af den
+almindelige session-middleware (intet særskilt CRON_SECRET-tjek nødvendigt),
+genererer samme tal som siden og sender som Content-Disposition: attachment
+med UTF-8 BOM foran (så Excel på Windows viser æøå korrekt).
+
+Hvad rapporten IKKE kan svare på endnu, af Spec.md's fem spørgsmål (vist som
+en tydelig note nederst på siden, ikke skjult):
+
+1. "Opkald pr. møde, pr. segment" - kan udledes af Ringet/Møder i tabellen,
+   men er ikke opdelt pr. segment endnu.
+4. "Hvilket timingsignal giver højest mødrate" - afventer flere
+   OSINT-signaltyper med reel volumen (Etape 8 har kun website/jobopslag/
+   cvr_aendring, og ingen kunder/leads har endnu signaler i produktion).
+5. "Hvad tjener vi pr. arbejdstime, pr. kunde" - Spec.md siger selv "byg
+   tidsregistrering pr. kunde (simpel start/stop), ellers kan det ikke
+   besvares." Tidsregistrering er en selvstændig, ubygget funktion (ny
+   tabel + start/stop-UI + kobling til kundens omsætning fra Økonomi-siden)
+   - for stor til at være en delopgave i denne omgang, byg den som sin egen
+   etape.
+
+Testet: alle rene funktioner har unit-tests (19 nye). npm run build og
+npm test er grønne. Browser-testet med rigtige klik (testbruger, se
+"Testbruger-oprettelse virker igen" i memory) - siden renderer korrekt med
+tomme datasæt (ingen kunder i produktion endnu), og CSV-download-linket
+returnerer 200 med korrekt Content-Disposition.
+
 ## Etape 5 — AI-berigelse
 
 Spec.md afsnit "4. AI-BRUG" og "4C. CLAUDE API". Bygget 2026-08-26 (kode +

@@ -14,6 +14,7 @@ tsconfig.tsbuildinfo
 # Diverse
 .DS_Store
 *.log
+klarvo-rapport_*.csv
 .vercel
 .env*
 !.env.example
