@@ -909,6 +909,56 @@ ovenfor undervejs, bekræftede derefter både den afviste bekræftelsesdialog
 (sletning IKKE gennemført) og den gennemførte sletning (lead væk,
 deletion_log-post til stede med korrekt begrundelse).
 
+## Etape 12 (compliance-delen) — Indsigts- og sletteanmodning
+
+Spec.md modulkatalog, "Indsigtsanmodning" og "Sletteanmodning" (begge Etape
+12). Bygget 2026-08-26, samme session som R7-sletterutinen ovenfor - deler
+infrastruktur med den (`lib/leads/sletLead.ts`, udtrukket fra sletterutinens
+oprindelige inline-logik).
+
+**Vigtigt fund undervejs:** `opt_out_register` (Spec.md Etape 2, "Central
+spærreliste... tjekkes ved import, ved godkendelse og ved visning i
+ringeliste") havde ALDRIG nogen applikationskode, der skrev til den - kun
+`SELECT`/`INSERT`-RLS-policies uden nogen UI. Selve håndhævelsen viste sig
+dog allerede at findes i databasetriggeren `beregn_lead_felter()`
+(`new.maa_kontaktes := not new.reklamebeskyttelse and not exists (select 1
+from opt_out_register o where o.cvr_nummer = new.cvr_nummer or o.telefon =
+new.telefon))` - så håndhævelsen var faktisk på plads fra start, kun
+*tilføjelse* til registret manglede en vej ind. Bekræftet ved test: en
+genimporteret virksomhed med samme CVR-nummer som en netop GDPR-slettet
+fik automatisk `maa_kontaktes: false`.
+
+- **`/indsigt`** (ejer-only, ny side) - søg på navn, telefon eller
+  CVR-nummer, viser matchende leads med links videre til den eksisterende
+  leaddetaljeside (genbruger al visningslogik dér i stedet for at duplikere
+  en ny "dossier"-visning).
+- **`app/api/leads/[id]/eksport`** - JSON-dump af leadet plus al relateret
+  data (aktiviteter, møder, signaler, ai_kald, activity_log). Ejer-only,
+  håndhævet i selve routen, ikke kun i UI'et.
+- **GDPR-sektion på leaddetaljer** (`/leads/[id]`, ejer-only) - "Eksportér
+  alt data" + "Slet og spær (GDPR)". Sidstnævnte adskiller sig bevidst fra
+  R7-sletterutinens "Slet"-knap: den tilføjer ALTID til
+  `opt_out_register` FØR selve sletningen (en GDPR-sletteanmodning er
+  implicit også "kontakt mig aldrig igen" - "kan aldrig fjernes, kun
+  tilføjes", Spec.md), mens R7's forældelses-sletning bare er oprydning af
+  data, ingen har rørt i lang tid, og ikke i sig selv et signal om at
+  personen/virksomheden vil spærres.
+
+**Ikke bygget i denne omgang** (samme "Compliance og dokumentation"-gruppe
+i modulkatalog, Etape 12): **Behandlingsfortegnelse** (auto-genereret
+oversigt over databehandling, PDF-eksport) og **Underleverandøroversigt**
+(liste over tredjeparter data passerer). Begge er mere dokumentation end
+funktionalitet - byg dem, når/hvis brugeren beder om det konkret, frem for
+at gætte på indholdet nu.
+
+Testet: `npm run build`/`npm test` grønne. Browser-testet med rigtige klik
+(ejer-testbruger): søgning fandt korrekt på delvist navn (matchede både
+kontaktperson- og virksomhedsnavn), eksport gav 200 med korrekt
+`Content-Disposition`, "Slet og spær" blev først korrekt blokeret af den
+afviste bekræftelsesdialog, og efter midlertidig test-bypass bekræftet at
+gennemføre slettet lead + korrekt `opt_out_register`-post + korrekt
+blokering af en efterfølgende genimport med samme CVR-nummer.
+
 ## Etape 5 — AI-berigelse
 
 Spec.md afsnit "4. AI-BRUG" og "4C. CLAUDE API". Bygget 2026-08-26 (kode +

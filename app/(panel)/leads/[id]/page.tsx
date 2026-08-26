@@ -11,6 +11,8 @@ import {
   Calculator,
   Handshake,
   Radar,
+  Search,
+  Download,
 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
@@ -21,6 +23,7 @@ import { TildelKundeForm } from "./tildel-kunde-form";
 import { HentSignalerKnap } from "./hent-signaler-knap";
 import { HentCvrAendringKnap } from "./hent-cvr-aendring-knap";
 import { BerigMedAiKnap } from "./berig-med-ai-knap";
+import { SletOgSpaerKnap } from "./slet-og-spaer-knap";
 
 type Lead = {
   id: string;
@@ -148,6 +151,14 @@ export default async function LeadDetaljeSide({
   if (error || !lead) {
     notFound();
   }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profil } = user
+    ? await supabase.from("profiler").select("rolle").eq("id", user.id).single()
+    : { data: null };
+  const erEjer = profil?.rolle === "ejer";
 
   const { data: log } = await supabase
     .from("activity_log")
@@ -525,6 +536,33 @@ export default async function LeadDetaljeSide({
             />
           </div>
         </div>
+
+        {erEjer && (
+          <section className="mt-6 rounded-lg border border-spaerret/20 bg-spaerret/[0.03] p-4">
+            <h2 className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-tekst">
+              <Search className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
+              GDPR: Indsigt og sletteanmodning
+            </h2>
+            <p className="mb-3 text-xs text-tekst-daempet">
+              Kun til besvarelse af en faktisk indsigts- eller sletteanmodning fra den registrerede
+              (Spec.md, Etape 12) - ikke til almindelig oprydning (brug{" "}
+              <Link href="/leads/sletterutine" className="text-accent hover:underline">
+                Sletterutine
+              </Link>{" "}
+              til forældede leads).
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={`/api/leads/${lead.id}/eksport`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-kant px-3 py-1.5 text-sm text-tekst-daempet transition-colors hover:border-accent hover:text-tekst"
+              >
+                <Download className="h-3.5 w-3.5" strokeWidth={1.75} />
+                Eksportér alt data
+              </a>
+              <SletOgSpaerKnap leadId={lead.id} virksomhedsnavn={lead.virksomhedsnavn} />
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

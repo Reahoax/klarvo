@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
+import { sletLeadOgRelateredeData } from "@/lib/leads/sletLead.ts";
 
 // Spec.md "R7 — Dataminimering og sletning": "kan slettes med ét klik. Log
 // hvad der slettes hvornår." Loggen skrives FØR selve sletningen, mens
@@ -43,22 +44,9 @@ export async function sletForaeldetLead(
     return { fejl: `Kunne ikke skrive til slettelog, sletningen blev IKKE gennemført: ${logFejl.message}` };
   }
 
-  // Fem tabeller har en "NO ACTION"-fremmednøgle til leads (bekræftet mod
-  // et rigtigt sletteforsøg 2026-08-26 - activity_log_lead_id_fkey fejlede,
-  // fordi ETHVERT lead har mindst én activity_log-række fra sin egen
-  // oprettelse). De skal ryddes FØR selve leadet slettes, ellers fejler
-  // sletningen med en constraint-fejl. signaler og lead_segmenter har
-  // CASCADE og ryddes automatisk af Postgres.
-  for (const tabel of ["aktiviteter", "moeder", "lead_snapshots", "ai_kald", "activity_log"] as const) {
-    const { error } = await supabase.from(tabel).delete().eq("lead_id", leadId);
-    if (error) {
-      return { fejl: `Kunne ikke rydde ${tabel} (log blev skrevet, leadet er IKKE slettet): ${error.message}` };
-    }
-  }
-
-  const { error: sletFejl } = await supabase.from("leads").delete().eq("id", leadId);
-  if (sletFejl) {
-    return { fejl: `Kunne ikke slette leadet selv (relaterede data er ryddet, log blev skrevet): ${sletFejl.message}` };
+  const resultat = await sletLeadOgRelateredeData(supabase, leadId);
+  if (!resultat.ok) {
+    return { fejl: `${resultat.fejl} (log blev skrevet, sletningen er ufuldstændig)` };
   }
 
   revalidatePath("/leads/sletterutine");
