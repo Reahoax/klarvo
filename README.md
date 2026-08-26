@@ -705,8 +705,9 @@ uden for "Tilladte kilder — byg mod disse" i ånd, som forudsætter lovligt
 tilgængelige data) — den rigtige vej er en officiel søge-API (fx Bing Web
 Search API via Azure, eller Google Custom Search JSON API), som kræver at
 brugeren selv opretter en konto og en API-nøgle, ligesom CVR-adgangen og den
-kommende `ANTHROPIC_API_KEY`. Spørg brugeren hvilken tjeneste, før dette
-bygges.
+kommende `ANTHROPIC_API_KEY`. **Bevidst udskudt (brugerens ord, 2026-08-26):**
+"Lad os vente med det indtil at vi skubber det ud til kunder" — spørg ikke
+om dette igen, medmindre brugeren selv nævner lancering/kunder/søgning.
 
 ## Teknisk stack
 
