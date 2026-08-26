@@ -194,3 +194,48 @@ export function byggFilterChips(
 
   return chips;
 }
+
+// Paginering af Tabel-visningen - "leads skal være på sider i stedet for en
+// lang liste" (brugerens ord, 2026-08-26). Kanban-visningen pagineres bevidst
+// ikke (se leads/page.tsx) - et board giver kun mening, når man ser alle
+// kolonner på én gang, ikke et udsnit.
+export const LEADS_PR_SIDE = 50;
+
+// Brugeren bad eksplicit om at kunne justere antal pr. side selv (samme
+// besked, 2026-08-26) - et fast sæt valgmuligheder i filterpanelet, ikke et
+// frit tal-felt, så en absurd høj værdi ikke kan bruges til reelt at fjerne
+// pagineringen igen og hente alt på én gang.
+export const LEADS_PR_SIDE_MULIGHEDER = [25, 50, 100, 200] as const;
+
+export function parseSide(
+  searchParams: Record<string, string | string[] | undefined>
+): number {
+  const raa = Array.isArray(searchParams.side) ? searchParams.side[0] : searchParams.side;
+  const tal = Number.parseInt(String(raa ?? "1"), 10);
+  return Number.isFinite(tal) && tal >= 1 ? tal : 1;
+}
+
+export function parseLeadsPrSide(
+  searchParams: Record<string, string | string[] | undefined>
+): number {
+  const raa = Array.isArray(searchParams.pr_side) ? searchParams.pr_side[0] : searchParams.pr_side;
+  const tal = Number.parseInt(String(raa ?? ""), 10);
+  return (LEADS_PR_SIDE_MULIGHEDER as readonly number[]).includes(tal) ? tal : LEADS_PR_SIDE;
+}
+
+export function beregnRange(
+  side: number,
+  sideStoerrelse: number = LEADS_PR_SIDE
+): { fra: number; til: number } {
+  const fra = (side - 1) * sideStoerrelse;
+  return { fra, til: fra + sideStoerrelse - 1 };
+}
+
+// Altid mindst 1, selv ved 0 rækker, så visningen kan sige "Side 1 af 1" i
+// stedet for det meningsløse "Side 1 af 0".
+export function beregnAntalSider(
+  antalRaekker: number,
+  sideStoerrelse: number = LEADS_PR_SIDE
+): number {
+  return Math.max(1, Math.ceil(antalRaekker / sideStoerrelse));
+}

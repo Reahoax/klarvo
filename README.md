@@ -60,6 +60,25 @@ API Keys → Secret keys** (starter med `sb_secret_...`), ikke under et felt der
 bogstaveligt hedder "service_role" — det forvirrede brugeren første gang, brug
 "Secret key" i stedet, hvis du nogensinde skal guide dem igen.
 
+**Sidste session, del 5 (2026-08-26):** Paginering af Leads-tabellen. Brugeren
+bad om at "leads'ne skal være på sider i stedet for en lang liste", og
+efterfølgende om selv at kunne justere antal pr. side i filterpanelet -
+begge dele bygget i `lib/leads/filters.ts` (`parseSide`, `parseLeadsPrSide`,
+`beregnRange`, `beregnAntalSider`, alle rene funktioner + testet) og
+`leads/page.tsx`. Kun Tabel-visningen pagineres - Kanban viser bevidst alle
+kolonner på én gang. Standard er 50 pr. side, valgbart til 25/100/200 via en
+ny "Leads pr. side"-dropdown i filterpanelet (et fast sæt, ikke et frit
+tal-felt, for at undgå at nogen taster en absurd høj værdi og reelt slår
+pagineringen fra igen). **Fejl fundet og rettet under browsertest:** et
+`?side=`-tal ud over det reelle antal sider gav en rå PostgREST-fejl
+("Requested range not satisfiable") i stedet for en brugbar besked - opstod
+fordi `.range()` blev bygget ud fra det ønskede sidetal FØR det filtrerede
+antal var kendt. Løst ved at hente det filtrerede antal i et separat opslag
+først, klemme sidetallet ind i det gyldige interval, og først derefter bygge
+`.range()` - se kommentaren i `leads/page.tsx`. CVR-importen er i mellemtiden
+vokset til 21.173 leads (12.710 kontaktbare), hvilket gjorde behovet for
+paginering meget konkret at teste imod.
+
 **Sidste session, del 4 (2026-08-24):** Etape 9 — Matching (Skærmbillede G),
 regelbaseret del. Brugeren bad om at "køre videre" lige efter Segmenter (del 3
 nedenfor) blev leveret - næste naturlige skridt i Spec.md's rækkefølge, og
@@ -605,7 +624,8 @@ Ordino/
         okonomi-formular.tsx    Klientkomponent: log en indtægt/omkostning
       leads/
         page.tsx                 Skærmbillede B+J: leadtabel, filterpanel, stat-kort,
-                                  Tabel/Kanban-visning
+                                  Tabel/Kanban-visning. Tabel er pagineret (50/side som
+                                  standard, justerbart), Kanban er bevidst ikke
         [id]/
           page.tsx                 Detaljevisning: alle felter + activity_log-historik +
                                     Snapshot-historik (Etape 7B, diffet mod forrige import) +
@@ -654,7 +674,9 @@ Ordino/
                                 standardpaletter, gem/hent/anvend/nulstil
     leads/
       telefon.ts                  Telefonnormalisering + tests
-      filters.ts                  Filterparsing/-anvendelse for leadtabellen
+      filters.ts                  Filterparsing/-anvendelse for leadtabellen + paginering
+                                    (parseSide/parseLeadsPrSide/beregnRange/beregnAntalSider,
+                                    alle rene funktioner + tests)
       pipeline.ts                  Delt definition af pipeline-stadier, labels, farver
       snapshots.ts                 Etape 7B: felter der spores, diff-beregning + tests
       ringetid.ts                   Etape 6: beregner om "nu" er indenfor det

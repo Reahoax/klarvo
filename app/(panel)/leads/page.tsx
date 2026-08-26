@@ -3,9 +3,14 @@ import { Building2 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import {
   anvendLeadsFiltre,
+  beregnAntalSider,
+  beregnRange,
   byggFilterChips,
+  LEADS_PR_SIDE_MULIGHEDER,
   medOverskrevneParametre,
   parseLeadsFiltre,
+  parseLeadsPrSide,
+  parseSide,
 } from "@/lib/leads/filters.ts";
 import { PIPELINE_FARVE, PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 
@@ -45,7 +50,7 @@ function sorterbarKolonne(params: {
   const { label, kolonne, filtre, sp } = params;
   const erAktiv = filtre.sort === kolonne;
   const naesteRetning = erAktiv && filtre.retning === "asc" ? "desc" : "asc";
-  const href = medOverskrevneParametre(sp, { sort: kolonne, retning: naesteRetning });
+  const href = medOverskrevneParametre(sp, { sort: kolonne, retning: naesteRetning, side: null });
   return (
     <Link href={href} className="inline-flex items-center gap-1 hover:text-tekst">
       {label}
@@ -67,36 +72,67 @@ export default async function LeadsSide({
   }
   const filtre = parseLeadsFiltre(spRaw);
   const visning = spRaw.visning === "kanban" ? "kanban" : "tabel";
+  const sideFraUrl = parseSide(spRaw);
+  const leadsPrSide = parseLeadsPrSide(spRaw);
 
   const supabase = await opretServerKlient();
+
+  const LEAD_FELTER =
+    "id, virksomhedsnavn, cvr_nummer, virksomhedsform, status, status_pipeline, antal_ansatte, by, telefon, maa_kontaktes, kvalificeret";
 
   const [
     { count: antalTotal },
     { count: antalKvalificeret },
     { count: antalSpaerret },
     { data: facetData },
-    filtreretResultat,
+    { count: antalEfterFilterFoer },
   ] = await Promise.all([
     supabase.from("leads").select("id", { count: "exact", head: true }),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("kvalificeret", true),
     supabase.from("leads").select("id", { count: "exact", head: true }).eq("maa_kontaktes", false),
     supabase.from("leads").select("virksomhedsform, status").returns<FacetRaekke[]>(),
-    anvendLeadsFiltre(
-      supabase
-        .from("leads")
-        .select(
-          "id, virksomhedsnavn, cvr_nummer, virksomhedsform, status, status_pipeline, antal_ansatte, by, telefon, maa_kontaktes, kvalificeret",
-          { count: "exact" }
-        ),
+    anvendLeadsFiltre(supabase.from("leads").select("id", { count: "exact", head: true }), filtre),
+  ]);
+
+  // Antal sider kendes først, når det filtrerede antal er hentet - derfor et
+  // separat, forudgående opslag frem for at gætte et .range() og risikere
+  // PostgRESTs "Requested range not satisfiable"-fejl for en side uden for
+  // rækkevidde (ramt under test af en URL med et for højt ?side=-tal).
+  const antalSider = beregnAntalSider(antalEfterFilterFoer ?? 0, leadsPrSide);
+  const side = Math.min(sideFraUrl, antalSider);
+  const { fra, til } = beregnRange(side, leadsPrSide);
+  // Adskilt fra "ingen leads matcher filtrene" nedenfor, så en forældet
+  // side-parameter (fx et gammelt bogmærke, eller et filter der lige er
+  // indsnævret) får sin egen, præcise besked i stedet for query-fejlen.
+  const sideUdenForRaekkevidde =
+    visning === "tabel" && sideFraUrl > antalSider && (antalEfterFilterFoer ?? 0) > 0;
+
+  // Springer selve rækkerne over, når siden alligevel viser "findes ikke"-
+  // beskeden nedenfor i stedet for tabellen - ellers ville et forkert
+  // ?side=-tal stille og roligt hente HELE det filtrerede datasæt (Kanban-
+  // stien), bare for at kassere det igen.
+  let leads: LeadRaekke[] | null = [];
+  let error: { message: string } | null = null;
+  let antalEfterFilter: number | null = antalEfterFilterFoer;
+
+  if (!sideUdenForRaekkevidde) {
+    // Kanban-visningen pagineres bevidst ikke - et board skal vise alle
+    // kolonner på én gang, ikke et vilkårligt udsnit af dem.
+    const leadsForespoergsel = anvendLeadsFiltre(
+      supabase.from("leads").select(LEAD_FELTER, { count: "exact" }),
       filtre
-    ) as Promise<{
+    );
+    const resultat = (await (visning === "tabel"
+      ? leadsForespoergsel.range(fra, til)
+      : leadsForespoergsel)) as {
       data: LeadRaekke[] | null;
       error: { message: string } | null;
       count: number | null;
-    }>,
-  ]);
-
-  const { data: leads, error, count: antalEfterFilter } = filtreretResultat;
+    };
+    leads = resultat.data;
+    error = resultat.error;
+    antalEfterFilter = resultat.count;
+  }
 
   const antalMaaKontaktes = (antalTotal ?? 0) - (antalSpaerret ?? 0);
   const kvalificeringsrate =
@@ -186,6 +222,7 @@ export default async function LeadsSide({
                     href={medOverskrevneParametre(sp, {
                       ansatte_fra: String(h.fra),
                       ansatte_til: h.til === null ? null : String(h.til),
+                      side: null,
                     })}
                     className="rounded-full border border-kant px-2.5 py-0.5 text-xs text-tekst-daempet transition-colors hover:border-accent hover:text-tekst"
                   >
@@ -309,6 +346,21 @@ export default async function LeadsSide({
             </div>
 
             <div className="p-4">
+              <label className="mb-1.5 block text-xs font-medium text-tekst">Leads pr. side</label>
+              <select
+                name="pr_side"
+                defaultValue={String(leadsPrSide)}
+                className="w-full rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none transition-colors focus-visible:border-accent"
+              >
+                {LEADS_PR_SIDE_MULIGHEDER.map((antal) => (
+                  <option key={antal} value={antal}>
+                    {antal}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="p-4">
               <label className="mb-1.5 block text-xs font-medium text-tekst">Tildeling</label>
               <div className="flex flex-col gap-0.5 text-tekst-daempet">
                 {[
@@ -346,7 +398,7 @@ export default async function LeadsSide({
             <div className="mb-3 flex items-center justify-between gap-2">
               <div className="inline-flex rounded-md border border-kant p-0.5 text-xs">
                 <Link
-                  href={medOverskrevneParametre(sp, { visning: null })}
+                  href={medOverskrevneParametre(sp, { visning: null, side: null })}
                   className={
                     visning === "tabel"
                       ? "rounded bg-flade-haevet px-3 py-1 font-medium text-tekst"
@@ -356,7 +408,7 @@ export default async function LeadsSide({
                   Tabel
                 </Link>
                 <Link
-                  href={medOverskrevneParametre(sp, { visning: "kanban" })}
+                  href={medOverskrevneParametre(sp, { visning: "kanban", side: null })}
                   className={
                     visning === "kanban"
                       ? "rounded bg-flade-haevet px-3 py-1 font-medium text-tekst"
@@ -366,7 +418,14 @@ export default async function LeadsSide({
                   Kanban
                 </Link>
               </div>
-              {leads && leads.length > 0 && (
+              {leads && leads.length > 0 && visning === "tabel" && (
+                <p className="text-xs text-tekst-daempet">
+                  Viser {fra + 1}–{Math.min(til + 1, antalEfterFilter ?? 0)} af{" "}
+                  {antalEfterFilter ?? leads.length} leads
+                  {antalTotal !== antalEfterFilter ? ` (${antalTotal ?? 0} i alt, ufiltreret)` : ""}
+                </p>
+              )}
+              {leads && leads.length > 0 && visning === "kanban" && (
                 <p className="text-xs text-tekst-daempet">
                   Viser {leads.length} af {antalEfterFilter ?? leads.length} leads
                   {antalTotal !== antalEfterFilter ? ` (${antalTotal ?? 0} i alt, ufiltreret)` : ""}
@@ -413,7 +472,22 @@ export default async function LeadsSide({
               </div>
             )}
 
-            {!error && (!leads || leads.length === 0) && (antalTotal ?? 0) > 0 && (
+            {!error && sideUdenForRaekkevidde && (
+              <div className="rounded-lg border border-kant bg-flade px-6 py-10 text-center">
+                <p className="text-sm text-tekst">
+                  Side {sideFraUrl} findes ikke - der er kun {antalSider} side
+                  {antalSider === 1 ? "" : "r"} med de valgte filtre.
+                </p>
+                <Link
+                  href={medOverskrevneParametre(sp, { side: null })}
+                  className="mt-2 inline-block text-sm text-accent underline"
+                >
+                  Gå til side 1
+                </Link>
+              </div>
+            )}
+
+            {!error && !sideUdenForRaekkevidde && (!leads || leads.length === 0) && (antalTotal ?? 0) > 0 && (
               <div className="rounded-lg border border-kant bg-flade px-6 py-10 text-center">
                 <p className="text-sm text-tekst">Ingen leads matcher de valgte filtre.</p>
                 <Link href="/leads" className="mt-2 inline-block text-sm text-accent underline">
@@ -536,6 +610,38 @@ export default async function LeadsSide({
                     </tbody>
                   </table>
                 </div>
+
+                {antalSider > 1 && (
+                  <div className="mt-3 flex items-center justify-center gap-3 text-sm">
+                    <Link
+                      href={medOverskrevneParametre(sp, {
+                        side: side > 1 ? String(side - 1) : null,
+                      })}
+                      aria-disabled={side <= 1}
+                      className={
+                        side <= 1
+                          ? "pointer-events-none rounded-md border border-kant px-3 py-1.5 text-tekst-daempet/40"
+                          : "rounded-md border border-kant px-3 py-1.5 text-tekst-daempet transition-colors hover:border-accent hover:text-tekst"
+                      }
+                    >
+                      ← Forrige
+                    </Link>
+                    <span className="tal text-tekst-daempet">
+                      Side {side} af {antalSider}
+                    </span>
+                    <Link
+                      href={medOverskrevneParametre(sp, { side: String(side + 1) })}
+                      aria-disabled={side >= antalSider}
+                      className={
+                        side >= antalSider
+                          ? "pointer-events-none rounded-md border border-kant px-3 py-1.5 text-tekst-daempet/40"
+                          : "rounded-md border border-kant px-3 py-1.5 text-tekst-daempet transition-colors hover:border-accent hover:text-tekst"
+                      }
+                    >
+                      Næste →
+                    </Link>
+                  </div>
+                )}
               </>
             )}
           </div>
