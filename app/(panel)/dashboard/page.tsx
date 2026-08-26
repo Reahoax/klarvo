@@ -9,10 +9,12 @@ import {
   PhoneForwarded,
   Users,
   Activity,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_FARVE, PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
+import { markerFejlLoest } from "./actions";
 
 type LeadRaekke = {
   id: string;
@@ -43,6 +45,13 @@ type AktivitetsRaekke = {
   felt: string;
   bruger_id: string | null;
   leads: { virksomhedsnavn: string } | null;
+};
+
+type FejlRaekke = {
+  id: string;
+  modul: string;
+  fejl: string;
+  oprettet: string;
 };
 
 function Hilsen(): string {
@@ -112,7 +121,7 @@ export default async function DashboardSide() {
     ? await supabase.from("profiler").select("navn").eq("id", user.id).single()
     : { data: null };
 
-  const [{ data: leads }, { data: kunder }, { data: ringIgen }, { data: aktivitet }] =
+  const [{ data: leads }, { data: kunder }, { data: ringIgen }, { data: aktivitet }, { data: fejl }] =
     await Promise.all([
       supabase
         .from("leads")
@@ -137,12 +146,19 @@ export default async function DashboardSide() {
         .order("sket", { ascending: false })
         .limit(6)
         .returns<AktivitetsRaekke[]>(),
+      supabase
+        .from("fejllog")
+        .select("id, modul, fejl, oprettet")
+        .is("loest", null)
+        .order("oprettet", { ascending: false })
+        .returns<FejlRaekke[]>(),
     ]);
 
   const alleLeads = leads ?? [];
   const kundeListe = kunder ?? [];
   const ringIgenListe = ringIgen ?? [];
   const aktivitetsListe = aktivitet ?? [];
+  const uloesteFejl = fejl ?? [];
 
   // profiler har ingen direkte fremmednøgle fra activity_log (begge peger på
   // auth.users), så PostgREST kan ikke embedde den automatisk - hentes separat
@@ -256,9 +272,54 @@ export default async function DashboardSide() {
             </ul>
           )}
           <p className="mt-3 text-[11px] text-tekst-daempet">
-            Regelbaseret overblik ud fra jeres egne tal — ikke AI-genereret endnu (afventer
-            Etape 5).
+            Regelbaseret overblik ud fra jeres egne tal — ikke AI-genereret (AI-berigelse er
+            bygget, men kræver ANTHROPIC_API_KEY, som endnu ikke er sat).
           </p>
+        </div>
+
+        <div className="kort-hover rounded-lg border border-kant bg-flade p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-tekst-daempet">
+              <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Fejllog
+            </p>
+            {uloesteFejl.length > 0 && (
+              <span className="rounded-full bg-spaerret/15 px-2 py-0.5 text-[11px] font-semibold text-spaerret">
+                {uloesteFejl.length}
+              </span>
+            )}
+          </div>
+          {uloesteFejl.length === 0 ? (
+            <p className="text-sm text-tekst-daempet">Ingen uløste fejl fra baggrundsjobs.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {uloesteFejl.map((f) => (
+                <li
+                  key={f.id}
+                  className="flex items-start justify-between gap-3 rounded-md border border-spaerret/20 bg-spaerret/5 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-tekst-daempet">
+                      {f.modul}
+                      <span className="normal-case">
+                        {new Date(f.oprettet).toLocaleString("da-DK")}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 break-words text-sm text-tekst">{f.fejl}</p>
+                  </div>
+                  <form action={markerFejlLoest} className="shrink-0">
+                    <input type="hidden" name="id" value={f.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-kant px-2 py-1 text-xs text-tekst-daempet transition-colors hover:border-godkendt hover:text-godkendt"
+                    >
+                      Markér løst
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

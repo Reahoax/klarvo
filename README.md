@@ -827,6 +827,26 @@ npm test er grønne. Browser-testet med rigtige klik (testbruger, se
 tomme datasæt (ingen kunder i produktion endnu), og CSV-download-linket
 returnerer 200 med korrekt Content-Disposition.
 
+## Fejllog og alarm (modulkatalog, "Drift", Etape 5)
+
+Bygget 2026-08-26. `fejllog`-tabellen fandtes allerede og fik data fra
+Etape 5's AI-berigelse (`lib/ai/berig.ts` logger vedvarende fejl dertil),
+men havde ingen UI overhovedet - stik imod Spec.md's egen "Ingen tavse
+fejl". Rettet: en ny sektion øverst på Dashboard (`/dashboard`, "forsiden")
+viser alle uløste fejl (`loest IS NULL`), med modul, tidspunkt, fejltekst
+og en "Markér løst"-knap (`app/(panel)/dashboard/actions.ts`, sætter
+`loest = now()`). Ingen fejl = et roligt "Ingen uløste fejl fra
+baggrundsjobs"-tomtilstand, ikke en skjult/manglende sektion.
+
+RLS-huller fundet og rettet undervejs (samme mønster som Etape 5-QC'en):
+`fejllog` havde kun SELECT+INSERT-policies, ingen UPDATE - "Markér
+løst"-knappen ville have fejlet stille for enhver bruger. Ny migration
+`tilfoej_update_policy_fejllog`.
+
+Browser-testet med rigtige klik: indsatte en test-fejl direkte i databasen,
+bekræftede den vises korrekt i UI'et, klikkede "Markér løst", bekræftede
+den forsvinder og tomtilstanden vises. Testdata slettet igen bagefter.
+
 ## Etape 5 — AI-berigelse
 
 Spec.md afsnit "4. AI-BRUG" og "4C. CLAUDE API". Bygget 2026-08-26 (kode +
