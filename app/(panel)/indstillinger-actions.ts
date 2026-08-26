@@ -265,6 +265,12 @@ export async function gemForretningsregler(
     return { fejl: "Import-advarselsgrænsen skal være et positivt tal." };
   }
 
+  const sletningRaa = String(formData.get("sletning_maaneder") ?? "").trim();
+  const sletningMaaneder = sletningRaa ? Number.parseInt(sletningRaa, 10) : null;
+  if (sletningRaa && (!Number.isFinite(sletningMaaneder) || sletningMaaneder === null || sletningMaaneder < 1)) {
+    return { fejl: "Forældelsesgrænsen skal være mindst 1 måned." };
+  }
+
   const ringetidFra = String(formData.get("ringetid_fra") ?? "").trim();
   const ringetidTil = String(formData.get("ringetid_til") ?? "").trim();
   const ringetidUgedage = formData
@@ -284,6 +290,7 @@ export async function gemForretningsregler(
         formData.get("virksomhedsformer_fysiske_personer")
       ),
       ...(graense !== null ? { import_advarsel_graense: graense } : {}),
+      ...(sletningMaaneder !== null ? { sletning_maaneder: sletningMaaneder } : {}),
       ...(ringetidFra ? { ringetid_fra: ringetidFra } : {}),
       ...(ringetidTil ? { ringetid_til: ringetidTil } : {}),
       ringetid_ugedage: ringetidUgedage,

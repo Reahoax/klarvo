@@ -8,6 +8,7 @@ type Konfiguration = {
   tilladte_virksomhedsformer: string[];
   virksomhedsformer_fysiske_personer: string[];
   import_advarsel_graense: number;
+  sletning_maaneder: number;
   ringetid_fra: string;
   ringetid_til: string;
   ringetid_ugedage: number[];

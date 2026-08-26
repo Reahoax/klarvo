@@ -21,6 +21,7 @@ type Konfiguration = {
   tilladte_virksomhedsformer: string[];
   virksomhedsformer_fysiske_personer: string[];
   import_advarsel_graense: number;
+  sletning_maaneder: number;
   ringetid_fra: string;
   ringetid_til: string;
   ringetid_ugedage: number[];
@@ -477,6 +478,23 @@ function ForretningsreglerSektion({ konfiguration }: { konfiguration: Konfigurat
           />
           <p className="mt-1 text-xs text-tekst-daempet">
             Advarer ved import, hvis det samlede antal leads efter importen overstiger dette tal.
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-tekst-daempet">
+            Forældelsesgrænse (måneder)
+          </label>
+          <input
+            type="number"
+            name="sletning_maaneder"
+            min={1}
+            defaultValue={konfiguration?.sletning_maaneder ?? undefined}
+            className="w-32 rounded-md border border-kant bg-baggrund px-2.5 py-1.5 text-sm text-tekst outline-none transition-colors focus-visible:border-accent"
+          />
+          <p className="mt-1 text-xs text-tekst-daempet">
+            Leads uden noget opkald i så mange måneder markeres som forældede under Leads →
+            Sletterutine (Spec.md R7 - "gem kun det nødvendige").
           </p>
         </div>
 

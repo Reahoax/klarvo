@@ -25,7 +25,7 @@ export default async function PanelLayout({
     ? await supabase
         .from("konfiguration")
         .select(
-          "tilladte_virksomhedsformer, virksomhedsformer_fysiske_personer, import_advarsel_graense, ringetid_fra, ringetid_til, ringetid_ugedage, osint_kontakt_email"
+          "tilladte_virksomhedsformer, virksomhedsformer_fysiske_personer, import_advarsel_graense, sletning_maaneder, ringetid_fra, ringetid_til, ringetid_ugedage, osint_kontakt_email"
         )
         .eq("id", true)
         .single()

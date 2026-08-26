@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_FARVE, PIPELINE_LABEL, PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
+import { erForaeldet } from "@/lib/leads/foraeldelse.ts";
 import { markerFejlLoest } from "./actions";
 
 type LeadRaekke = {
@@ -118,8 +119,9 @@ export default async function DashboardSide() {
   } = await supabase.auth.getUser();
 
   const { data: profil } = user
-    ? await supabase.from("profiler").select("navn").eq("id", user.id).single()
+    ? await supabase.from("profiler").select("navn, rolle").eq("id", user.id).single()
     : { data: null };
+  const erEjer = profil?.rolle === "ejer";
 
   const [{ data: leads }, { data: kunder }, { data: ringIgen }, { data: aktivitet }, { data: fejl }] =
     await Promise.all([
@@ -187,7 +189,41 @@ export default async function DashboardSide() {
       new Date(l.oprettet) < enUgeSiden
   ).length;
 
+  // R7-sletterutinen er ejer-only (permanent sletning), så tjekket
+  // springes helt over for operatører - ingen grund til at hente/regne på
+  // hele leads-tabellen for en opgave, de alligevel ikke kan handle på.
+  let foraeldedeAntal = 0;
+  if (erEjer) {
+    const [{ data: konfiguration }, { data: alleLeadsForForaeldelse }, { data: alleAktiviteter }] =
+      await Promise.all([
+        supabase.from("konfiguration").select("sletning_maaneder").eq("id", true).single(),
+        supabase.from("leads").select("id, oprettet"),
+        supabase.from("aktiviteter").select("lead_id, oprettet").order("oprettet", { ascending: false }),
+      ]);
+    const taerskel = konfiguration?.sletning_maaneder ?? 12;
+    const senesteAktivitetPrLead = new Map<string, string>();
+    for (const a of alleAktiviteter ?? []) {
+      if (!senesteAktivitetPrLead.has(a.lead_id)) senesteAktivitetPrLead.set(a.lead_id, a.oprettet);
+    }
+    const nu = new Date();
+    foraeldedeAntal = (alleLeadsForForaeldelse ?? []).filter((l) =>
+      erForaeldet(
+        new Date(l.oprettet),
+        senesteAktivitetPrLead.has(l.id) ? new Date(senesteAktivitetPrLead.get(l.id)!) : null,
+        taerskel,
+        nu
+      )
+    ).length;
+  }
+
   const opgaver: { tekst: string; haster: "NU" | "I DAG" | "SNART"; href: string }[] = [];
+  if (foraeldedeAntal > 0) {
+    opgaver.push({
+      tekst: `${foraeldedeAntal} lead${foraeldedeAntal === 1 ? "" : "s"} er forældet og klar til sletterutine`,
+      haster: "SNART",
+      href: "/leads/sletterutine",
+    });
+  }
   if (ringIgenListe.length > 0) {
     opgaver.push({
       tekst: `${ringIgenListe.length} genringning${ringIgenListe.length === 1 ? "" : "er"} er forfaldne`,

@@ -847,6 +847,68 @@ Browser-testet med rigtige klik: indsatte en test-fejl direkte i databasen,
 bekræftede den vises korrekt i UI'et, klikkede "Markér løst", bekræftede
 den forsvinder og tomtilstanden vises. Testdata slettet igen bagefter.
 
+## Etape 12 (R7-delen) — Sletterutine
+
+Spec.md "R7 — Dataminimering og sletning": "Gem kun de felter, der står i
+datamodellen. Byg fra dag ét en sletterutine: leads uden aktivitet i X
+måneder (konfigurerbar, default 12) markeres til sletning og kan slettes
+med ét klik. Log hvad der slettes hvornår." Bygget 2026-08-26. `konfiguration.
+sletning_maaneder` og `deletion_log` fandtes allerede i skemaet (default
+12), men ingen applikationskode brugte dem.
+
+- **`lib/leads/foraeldelse.ts`** - `erForaeldet(oprettet, senesteAktivitet,
+  taerskelMaaneder)`, ren funktion. "Aktivitet" er bevidst et opkald
+  (en `aktiviteter`-række), ikke enhver databaseændring -
+  `activity_log` rammes også af automatiske ting som CVR-genimport og
+  ville gøre stort set intet lead forældet nogensinde.
+- **`/leads/sletterutine`** (ejer-only, ny side) - lister forældede leads
+  med seneste opkaldsdato, "Slet"-knap pr. lead.
+- **`app/(panel)/leads/sletterutine/actions.ts`** - `sletForaeldetLead`:
+  skriver til `deletion_log` FØR selve sletningen (loggen har bevidst
+  ingen fremmednøgle til leads), derefter leadet.
+- **`sletning_maaneder`** eksponeret i Indstillinger → Forretningsregler,
+  samme mønster som `import_advarsel_graense`.
+- **Dashboard** ("forsiden") viser et "X leads er forældet"-punkt i
+  "Dagens overblik", når der er noget at handle på (kun for ejere).
+- **Bekræftelse påkrævet** (`window.confirm()`) før sletning, trods
+  specens "ét klik" - permanent sletning er den type handling, hvor en
+  ekstra sikring er værd besværet, samme princip som saldo-i-minus-
+  bekræftelsen i Ringeliste.
+
+**Reel fejl fundet og rettet ved browser-test:** første sletteforsøg
+fejlede med `foreign key constraint "activity_log_lead_id_fkey"` - ETHVERT
+lead har mindst én `activity_log`-række fra sin egen oprettelse, og fem
+tabeller (`activity_log`, `lead_snapshots`, `aktiviteter`, `moeder`,
+`ai_kald`) har `NO ACTION`-fremmednøgler til `leads`, ikke `CASCADE`. Uden
+rettelsen ville sletterutinen ALTID have fejlet for ethvert rigtigt lead.
+Rettet: de fem tabeller ryddes eksplicit (pr. lead) før selve leadet
+slettes. `signaler` og `lead_segmenter` har allerede `CASCADE` og krævede
+ingen ændring. Samtidig fundet (samme RLS-mønster som resten af sessionen):
+`leads` havde ingen DELETE-policy, og de fem relaterede tabeller havde
+ingen DELETE-policy overhovedet - alle tilføjet, rollebegrænset til `ejer`
+(migration `tilfoej_delete_policy_leads_og_insert_deletion_log` +
+`tilfoej_delete_policies_relaterede_lead_tabeller`).
+
+**Bevidst spænding mellem R7 og R8 løst:** R8 kræver at "alt logges" (hvor
+et lead kom fra, hvad der er sket med det), mens R7 kræver reel sletning
+("dataminimering"). Løsningen er `deletion_log`: den overlever leadets
+sletning (ingen fremmednøgle), og bliver den permanente, sammenfattende
+post, der erstatter den detaljerede historik, når historikken selv
+slettes sammen med leadet.
+
+**Ikke bygget i denne omgang:** "Backup" (Spec.md modulkatalog, Etape 1 -
+"automatisk daglig dump, test at den kan gendannes") er en Supabase-plan-
+afhængighed, ikke applikationskode - free-planen har begrænset backup/PITR,
+og en opgradering til Pro er allerede bevidst udskudt (se "Kendt
+driftsrisiko" ovenfor). Byg det ikke om for at kompensere i koden.
+
+Testet: 6 nye unit-tests for `erForaeldet`. `npm run build`/`npm test`
+grønne. Browser-testet med rigtige klik (ejer-testbruger, ét testlead
+20 måneder gammelt uden aktivitet) - fandt og rettede FK-fejlen beskrevet
+ovenfor undervejs, bekræftede derefter både den afviste bekræftelsesdialog
+(sletning IKKE gennemført) og den gennemførte sletning (lead væk,
+deletion_log-post til stede med korrekt begrundelse).
+
 ## Etape 5 — AI-berigelse
 
 Spec.md afsnit "4. AI-BRUG" og "4C. CLAUDE API". Bygget 2026-08-26 (kode +
