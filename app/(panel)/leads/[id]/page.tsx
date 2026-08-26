@@ -325,12 +325,15 @@ export default async function LeadDetaljeSide({
               </div>
             </section>
 
-            <section>
-              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-tekst">
-                <Sparkles className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
-                AI-felter <span className="text-tekst-daempet">— ikke verificeret</span>
+            <section className="rounded-lg border border-accent/20 bg-accent/[0.03] p-3">
+              <h2 className="mb-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-tekst">
+                <Sparkles className="h-4 w-4 text-accent" strokeWidth={1.75} />
+                AI-felter
+                <span className="inline-flex items-center rounded-full border border-advarsel/40 bg-advarsel-baggrund px-2.5 py-0.5 text-[11px] font-medium text-advarsel">
+                  Ikke verificeret
+                </span>
               </h2>
-              <p className="mb-2 text-xs text-tekst-daempet">
+              <p className="mb-3 text-xs text-tekst-daempet">
                 Kræver at signaler er hentet for leadet først (se "Signaler" nedenfor).
                 AI-score kræver desuden, at leadet er tildelt en kunde med en ICP.
               </p>
@@ -340,7 +343,7 @@ export default async function LeadDetaljeSide({
                 <Felt label="AI-score (1-10)" vaerdi={lead.ai_score} tal />
                 <Felt label="AI-score begrundelse" vaerdi={lead.ai_score_begrundelse ?? "Ikke genereret endnu"} />
               </div>
-              <div className="mt-2">
+              <div className="mt-3">
                 <BerigMedAiKnap leadId={lead.id} />
               </div>
             </section>
@@ -354,7 +357,8 @@ export default async function LeadDetaljeSide({
                 "Hjemmeside" og "jobopslag" hentes fra virksomhedens egen hjemmeside og en evt.
                 fundet karriereside, med robots.txt respekteret og maks. ét kald pr. domæne pr.
                 5 sekunder. "CVR-ændring" hentes fra Erhvervsstyrelsens CVR-forbindelse
-                (samme adgang som Etape 11's import). "Regnskab" og "presse" er ikke bygget endnu.
+                (samme adgang som Etape 11's import). "Regnskab" og "anmeldelse" er blokeret af
+                kildernes egen robots.txt (se README) - "presse" afventer lancering.
               </p>
               <div className="flex flex-col gap-3">
                 {(signaler ?? []).length === 0 && (

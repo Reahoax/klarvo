@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { byggResumePrompt, byggHypotesePrompt, byggScorePrompt, beskrivIcp } from "../prompts.ts";
+import { byggResumePrompt, byggHypotesePrompt, byggScorePrompt, beskrivIcp, harIcpKriterier } from "../prompts.ts";
 
 test("byggResumePrompt pakker materialet i <materiale>-tags", () => {
   const { besked } = byggResumePrompt("Vi laver møbler.");
@@ -48,4 +48,14 @@ test("beskrivIcp formaterer alle angivne kriterier", () => {
 
 test("beskrivIcp giver en klar besked, når ingen kriterier er sat", () => {
   assert.equal(beskrivIcp({}), "Ingen specifikke ICP-kriterier angivet.");
+});
+
+test("harIcpKriterier er false for et tomt ICP-objekt (databasens default)", () => {
+  assert.equal(harIcpKriterier({}), false);
+});
+
+test("harIcpKriterier er true, hvis blot ét kriterie er sat", () => {
+  assert.equal(harIcpKriterier({ postnumre: ["2100"] }), true);
+  assert.equal(harIcpKriterier({ ansatte_fra: 5 }), true);
+  assert.equal(harIcpKriterier({ ansatte_til: 0 }), true);
 });

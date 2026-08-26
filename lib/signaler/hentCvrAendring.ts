@@ -4,6 +4,7 @@ import { skalVente } from "./tidsregler.ts";
 import { hentVirksomhedHistorik } from "@/lib/cvr/historikOpslag.ts";
 import { udledCvrAendringer, formaterCvrAendringerTilTekst } from "./cvrAendring.ts";
 import type { EnkeltSignalResultat } from "./hentSignaler.ts";
+import { opretServiceKlient } from "@/lib/supabase/service.ts";
 
 // Etape 8 (Spec.md "4B. OSINT", kildetypen "cvr_aendring") - orkestrering:
 // cache først, så rate limit, så selve CVR-opslaget (lib/cvr/historikOpslag.ts)
@@ -26,11 +27,24 @@ export async function hentCvrAendringForLead(
     return { ok: true, genbrugtFraCache: true, vaerdi: cache.vaerdi, kildeUrl: cache.kilde_url };
   }
 
-  const { data: forbindelse } = await supabase
-    .from("cvr_forbindelse")
-    .select("brugernavn, password")
-    .eq("id", true)
-    .maybeSingle();
+  // cvr_forbindelse.password må kun læses af rollen "ejer" (RLS, Etape 11) -
+  // "Hent CVR-historik" skal virke for enhver intern bruger, ikke kun ejeren,
+  // så credentialet hentes her med servicerolle-klienten (samme princip som
+  // den natlige CVR-import-cron i lib/cvr/importer.ts), IKKE med den
+  // sessionsbundne klient der er sendt ind som `supabase`-parameteren.
+  // opretServiceKlient() kaster synkront, hvis SUPABASE_SERVICE_ROLE_KEY
+  // mangler (fx lokalt uden .env.local) - fanges her, så knappen viser en
+  // pæn fejlbesked som resten af appen, i stedet for at server actionen
+  // crasher ukontrolleret.
+  let forbindelse: { brugernavn: string | null; password: string | null } | null;
+  try {
+    const serviceKlient = opretServiceKlient();
+    const { data } = await serviceKlient.from("cvr_forbindelse").select("brugernavn, password").eq("id", true).maybeSingle();
+    forbindelse = data;
+  } catch (fejl) {
+    const besked = fejl instanceof Error ? fejl.message : "Ukendt fejl.";
+    return { ok: false, besked: `Kunne ikke tilgå CVR-forbindelsen: ${besked}` };
+  }
   if (!forbindelse?.brugernavn || !forbindelse.password) {
     return {
       ok: false,

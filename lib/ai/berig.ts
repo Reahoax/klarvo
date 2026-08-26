@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { erAiKonfigureret, opretAiKlient } from "./klient.ts";
 import { AI_MODEL, beregnPrisUsd } from "./pris.ts";
 import { hashInput } from "./hash.ts";
-import { byggResumePrompt, byggHypotesePrompt, byggScorePrompt, beskrivIcp, type Prompt } from "./prompts.ts";
+import { byggResumePrompt, byggHypotesePrompt, byggScorePrompt, beskrivIcp, harIcpKriterier, type Prompt } from "./prompts.ts";
 import { validerResumeSvar, validerHypoteseSvar, validerScoreSvar, parseJsonSvar } from "./skema.ts";
 import type { Icp } from "@/lib/matching/score.ts";
 
@@ -95,7 +95,11 @@ async function berigÉtFelt(
 
   const gyldigt = await skriv(json);
 
-  await supabase.from("ai_kald").insert({
+  // Fejler selve databaseskrivningen (fx en fremtidig RLS-regression), skal
+  // det behandles som en vedvarende fejl på lige fod med en API-fejl - IKKE
+  // rapporteres som "opdateret", når intet reelt blev gemt. Kastes videre,
+  // så det fanges af berigLeads try/catch og stopper jobbet.
+  const { error: ai_kald_fejl } = await supabase.from("ai_kald").insert({
     lead_id: leadId,
     kunde_id: kundeId,
     felttype,
@@ -106,6 +110,9 @@ async function berigÉtFelt(
     status: gyldigt ? "ok" : "valideringsfejl",
     fejl: gyldigt ? null : "Svaret matchede ikke det forventede JSON-skema - feltet er sat til null.",
   });
+  if (ai_kald_fejl) {
+    throw new Error(`Kunne ikke skrive omkostningslog for "${felttype}": ${ai_kald_fejl.message}`);
+  }
 
   return "udfoert";
 }
@@ -154,7 +161,8 @@ export async function berigLead(supabase: SupabaseClient, leadId: string): Promi
       byggResumePrompt(websiteMateriale),
       async (raa) => {
         const svar = validerResumeSvar(raa);
-        await supabase.from("leads").update({ ai_resume: svar?.resume ?? null }).eq("id", leadId);
+        const { error } = await supabase.from("leads").update({ ai_resume: svar?.resume ?? null }).eq("id", leadId);
+        if (error) throw new Error(`Kunne ikke skrive ai_resume: ${error.message}`);
         return svar !== null;
       }
     );
@@ -169,13 +177,14 @@ export async function berigLead(supabase: SupabaseClient, leadId: string): Promi
       byggHypotesePrompt(hypoteseMateriale),
       async (raa) => {
         const svar = validerHypoteseSvar(raa);
-        await supabase.from("leads").update({ ai_hypotese: svar?.hypotese ?? null }).eq("id", leadId);
+        const { error } = await supabase.from("leads").update({ ai_hypotese: svar?.hypotese ?? null }).eq("id", leadId);
+        if (error) throw new Error(`Kunne ikke skrive ai_hypotese: ${error.message}`);
         return svar !== null;
       }
     );
     (hypoteseUdfald === "udfoert" ? udfoerte : sprunget_over).push("hypotese");
 
-    if (icp) {
+    if (icp && harIcpKriterier(icp)) {
       const scoreUdfald = await berigÉtFelt(
         supabase,
         leadId,
@@ -184,10 +193,11 @@ export async function berigLead(supabase: SupabaseClient, leadId: string): Promi
         byggScorePrompt(websiteMateriale, beskrivIcp(icp)),
         async (raa) => {
           const svar = validerScoreSvar(raa);
-          await supabase
+          const { error } = await supabase
             .from("leads")
             .update({ ai_score: svar?.score ?? null, ai_score_begrundelse: svar?.begrundelse ?? null })
             .eq("id", leadId);
+          if (error) throw new Error(`Kunne ikke skrive ai_score: ${error.message}`);
           return svar !== null;
         }
       );
@@ -195,10 +205,13 @@ export async function berigLead(supabase: SupabaseClient, leadId: string): Promi
     }
   } catch (fejl) {
     const besked = fejl instanceof Error ? fejl.message : "Ukendt fejl.";
-    await supabase.from("fejllog").insert({
+    const { error: fejllogFejl } = await supabase.from("fejllog").insert({
       modul: "ai_berigelse",
       fejl: `Lead ${leadId}: ${besked}`,
     });
+    if (fejllogFejl) {
+      console.error("Kunne ikke skrive til fejllog (se konsollen, ikke fejlloggen):", fejllogFejl.message);
+    }
     return {
       ok: false,
       fejl: `AI-kaldet fejlede vedvarende: ${besked}. Berigelsen er stoppet for at undgå at brænde penge på gentagne fejl - se fejlloggen.`,

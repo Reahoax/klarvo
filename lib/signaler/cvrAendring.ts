@@ -23,9 +23,15 @@ function udledSkift<T extends { periode: Periode }>(
   const sorteret = sorterKronologisk(liste);
   const resultat: AendringsPost[] = [];
   for (let i = 1; i < sorteret.length; i++) {
+    const foer = visning(sorteret[i - 1]);
+    const efter = visning(sorteret[i]);
+    // Springer over, hvis to på-hinanden-følgende perioder reelt har samme
+    // værdi (fx en administrativ periode-opdatering uden en indholdsændring)
+    // - ellers ville et "X → X" blive vist som en falsk ændring.
+    if (foer === efter) continue;
     resultat.push({
       type,
-      beskrivelse: `${visning(sorteret[i - 1])} → ${visning(sorteret[i])}`,
+      beskrivelse: `${foer} → ${efter}`,
       dato: sorteret[i].periode?.gyldigFra ?? null,
     });
   }

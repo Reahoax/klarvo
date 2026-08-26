@@ -37,6 +37,20 @@ Svar udelukkende med JSON på formen {"hypotese": string | null}.`;
   return { system, besked: pakMateriale(materiale) };
 }
 
+// Bruges til at afgøre, om AI-score overhovedet skal køres for en kunde -
+// et tomt {}-objekt (databasens default, kunder.icp) er en gyldig, ikke-null
+// Icp, men indeholder intet at score imod. At køre AI-scoren alligevel ville
+// spilde et betalt kald på en meningsløs vurdering (se lib/ai/berig.ts).
+export function harIcpKriterier(icp: Icp): boolean {
+  return Boolean(
+    icp.virksomhedsformer?.length ||
+      icp.branchekoder?.length ||
+      icp.postnumre?.length ||
+      icp.ansatte_fra != null ||
+      icp.ansatte_til != null
+  );
+}
+
 export function beskrivIcp(icp: Icp): string {
   const dele: string[] = [];
   if (icp.virksomhedsformer?.length) dele.push(`Virksomhedsform: ${icp.virksomhedsformer.join(", ")}`);

@@ -44,8 +44,13 @@ export async function hentVirksomhedHistorik(
 ): Promise<CvrHistorikResultat> {
   const basicAuth = Buffer.from(`${brugernavn}:${password}`).toString("base64");
 
+  // cvrNummer sendes som tal, ikke streng - Vrvirksomhed.cvrNummer er
+  // indekseret som "long" (bekræftet på offentliggoerelser-indekset, samme
+  // Elasticsearch-vært), og en "term"-forespørgsel matcher mest pålideligt
+  // mod feltets eget datatype. leads.cvr_nummer er allerede valideret til
+  // præcis 8 cifre ved import (se lib/cvr/mapning.ts), så Number() er sikker.
   const body = {
-    query: { term: { "Vrvirksomhed.cvrNummer": cvrNummer } },
+    query: { term: { "Vrvirksomhed.cvrNummer": Number(cvrNummer) } },
     size: 1,
     _source: [
       "Vrvirksomhed.navne",

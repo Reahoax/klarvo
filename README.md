@@ -838,6 +838,48 @@ UI-delen (knap, felt-visning) er derfor kun verificeret ved kodegennemgang
 + typetjek + build, ikke et faktisk museklik — gør det, når nøglen sættes
 og en rigtig test bliver meningsfuld.
 
+### Kvalitetskontrol af Etape 5 + 8-udvidelsen (2026-08-26)
+
+Brugeren bad eksplicit om at få hele sessionens arbejde kvalitetskontrolleret
+bagefter. Det fandt tre reelle fejl, alle rettet samme session:
+
+1. **`ai_kald` og `fejllog` manglede en INSERT-policy i RLS.** Begge tabeller
+   havde kun en SELECT-policy for `authenticated` (skrivning var aldrig
+   testet, da tabellerne var ubrugte før nu). `berigLead`s omkostningslog og
+   fejllogning ville derfor være fejlet **stille** for enhver almindelig
+   indlogget bruger - koden tjekkede oprindeligt heller ikke `.error` på
+   disse writes, så en bruger ville have set "Opdateret: resume" uden at
+   noget reelt var logget. Rettet med migrationen
+   `tilfoej_insert_policy_ai_kald_og_fejllog`, og `lib/ai/berig.ts` kaster nu
+   videre (stopper jobbet, samme princip som en API-fejl), hvis en
+   databaseskrivning fejler.
+2. **`hentCvrAendringForLead` læste `cvr_forbindelse` med sessionsklienten.**
+   RLS begrænser den kolonne til rollen `ejer` (bevidst, Etape 11) - så
+   "Hent CVR-historik" ville altid have fejlet med "Ingen CVR-forbindelse er
+   gemt" for enhver almindelig operatør, selvom forbindelsen faktisk var
+   sat op. Rettet til at bruge `opretServiceKlient()` for netop dette
+   opslag (samme princip som CVR-import-cronen), med resten af funktionen
+   uændret på sessionsklienten.
+3. **AI-score kunne køres uden reelle ICP-kriterier.** `kunder.icp`s
+   database-default er `{}` (tomt objekt) - `if (icp)` var derfor altid
+   sandt for enhver kunde, selv en helt ny uden kriterier sat, hvilket ville
+   spilde et betalt AI-kald på en meningsløs vurdering. Ny funktion
+   `harIcpKriterier()` i `lib/ai/prompts.ts` gater nu score-kaldet korrekt.
+
+Mindre rettelser: `Vrvirksomhed.cvrNummer` sendes nu som tal, ikke streng, i
+CVR-historik-opslaget (feltet er indekseret som `long`); `udledSkift()` i
+`lib/signaler/cvrAendring.ts` springer nu no-op-"ændringer" over (to
+tidsserie-perioder med identisk værdi). 138 tests grønne efter rettelserne.
+
+Samtidig fik de tre "hent/berig"-knapper på leaddetaljer et visuelt løft
+(`knap-status.tsx`): spinner-ikon under kørsel i stedet for kun tekst,
+ikonbaserede succes-/fejllinjer (✓/✗) i stedet for bare farvet tekst, og et
+lille tryk-feedback (`active:scale`). AI-felter-sektionen har fået en
+tydelig "Ikke verificeret"-badge (advarselsfarvet pille, jf. Spec.md's krav
+om synlig markering af AI-genereret indhold) og en let accent-tonet
+kortramme, så den visuelt skiller sig ud som "AI-indhold" fra resten af
+leaddetaljer.
+
 ## Teknisk stack
 
 - **Next.js (App Router) + TypeScript** — server-rendering, så følsomme kald
