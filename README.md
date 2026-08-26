@@ -319,7 +319,7 @@ CVR system-til-system-adgangen (punkt 2 herover, tidligere) er modtaget og forbu
 | 6 — Godkendelse og ringeliste | Bygget (2026-08-13): godkendelse, ringeliste, 5 udfald, genringning (maks. 4 forsøg), ringetidsvindue (default hverdage 9-16, `lib/leads/ringetid.ts`, redigeres i Indstillinger → Forretningsregler), indvendingslog (fast liste, `lib/leads/indvendinger.ts`, kun ved "Lagde på"/"Ikke interesseret"), opkaldsmanuskripter pr. kunde med versionering (`manuskripter`-tabel, redigeres på kundedetaljer, vist i ringelisten, version logges på hvert opkald). Manuskripter pr. *segment* har kun fået sin databasekolonne (`segment_id`) — ingen UI endnu, da leads ikke tildeles segmenter automatisk (Etape 9). "Møde booket" er stadig kun deaktiveret indtil et lead kan tildeles en kunde (Matching, Etape 9) |
 | 7 — Kunder | Bygget: liste, oprettelse, stamdata, saldo, DPA-tracker, ICP-kriterier |
 | 7B — Snapshots | Bygget (2026-08-13): `lead_snapshots` fyldes automatisk ved hver import (før helt ubrugt), diffes mod forrige snapshot og vises på leaddetaljer under "Snapshot-historik" — adskilt fra den generelle "Historik" (activity_log), som dækker alle kilder. `soegning_snapshots` gemmer nu også CVR-listen pr. import. "Ny P-enhed" fra Spec.md kan ikke spores — P-enhed findes ikke som felt i datamodellen |
-| 5 — AI-berigelse | Ikke bygget — afventer `ANTHROPIC_API_KEY` fra dig |
+| 5 — AI-berigelse | Bygget (2026-08-26), men **ikke i drift** — afventer `ANTHROPIC_API_KEY` fra dig. Manuel "Berig med AI"-knap pr. lead på leaddetaljer, model `claude-haiku-4-5`. Se "Etape 5 — AI-berigelse" nedenfor |
 | 11 — CVR API-integration | Bygget og bekræftet virkende i produktion (2026-08-24): forbindelse, søgning, feltmapping og automatisk import til Leads via Vercel Cron (dagligt, ingen manuel knap). Ende-til-ende-verificeret direkte mod produktions-URL'en: 200 hentet, 200 importeret, 134 korrekt spærret. Import gennemløber nu hele det filtrerede datasæt over flere nætter (`search_after`, `cvr_import_fremgang`), ikke en fast portion. CSV-import er fjernet helt (2026-08-24) — dette er nu den eneste vej ind for leads, se "Etablerede mønstre" |
 | 7C — ICP-analyse og segmenter | Delvist bygget (2026-08-24): **segmenter** er på plads — navngivne ICP'er pr. kunde (`segmenter`-tabellen, samme kriterie-form som `kunder.icp`), med statistik pr. segment (leads tilknyttet, ringet, kontaktrate, mødrate - se `lib/segmenter/statistik.ts`) og manuel tildeling af et lead til en kunde/segmenter fra leaddetaljer ("Kunde og segment"). **ICP-analysen** (bagudrettet: upload liste over bedste kunder → CVR-opslag → statistisk udkast til ICP) er ikke bygget - brugeren valgte eksplicit at starte med segmenter først |
 | 8 — OSINT-signaler | Delvist bygget (2026-08-26): fundamentet (rate limiting, robots.txt, 30-dages cache) plus to kildetyper - "website" (titel + meta-beskrivelse fra forsiden) og "jobopslag" (finder et karriere-/jobside-link i forsidens HTML ud fra nøgleord, henter den samme måde). De to deler ét robots.txt-opslag og én rate-limit-slot pr. domæne. Testet ende-til-ende mod example.com: email-spærring, robots.txt-respekt, cache-genbrug, korrekt håndteret 404 og korrekt "intet karriere-link fundet" blev alle bekræftet. Øvrige fire kildetyper (regnskab, cvr_aendring, presse, anmeldelse) er ikke bygget - "én kildetype ad gangen" |
@@ -708,6 +708,83 @@ brugeren selv opretter en konto og en API-nøgle, ligesom CVR-adgangen og den
 kommende `ANTHROPIC_API_KEY`. **Bevidst udskudt (brugerens ord, 2026-08-26):**
 "Lad os vente med det indtil at vi skubber det ud til kunder" — spørg ikke
 om dette igen, medmindre brugeren selv nævner lancering/kunder/søgning.
+
+## Etape 5 — AI-berigelse
+
+Spec.md afsnit "4. AI-BRUG" og "4C. CLAUDE API". Bygget 2026-08-26 (kode +
+tests + build grønt), men **ikke sat i drift** — `ANTHROPIC_API_KEY` er
+bevidst udskudt, se "Bevidst udskudt" ovenfor. Uden nøglen fejler
+AI-berigelse med det samme og pænt, uden noget databasekald overhovedet
+(bevist af testen `berigLead stopper før nogen databaseadgang...` i
+`lib/ai/__tests__/berig.test.ts`) — ikke en rå exception midt i et kald.
+
+**Modelvalg:** `claude-haiku-4-5` ($1/$5 pr. million input/output-tokens,
+opslået i Anthropics dokumentation 2026-08-26, ikke gættet fra hukommelsen).
+De tre AI-felter er simple, afgrænsede opgaver (kort opsummering, én
+hypotese-sætning, en 1-10-score) — Spec.md beder eksplicit om "den billigste
+model, der kan løse opgaven", og Haiku 4.5 er den billigste nuværende model.
+
+**Bevidst en manuel, pr.-lead-knap ("Berig med AI" på leaddetaljer), ikke et
+automatisk baggrundsjob over hele leads-tabellen.** Brugeren rejste selv
+omkostningsspørgsmålet ("hvis flere 100'er og 1000 mennesker bruger det så
+bliver det jo dyrt") — men prisen skalerer reelt med antal **leads** der
+beriges, ikke antal brugere af panelet. Etape 11's automatiske CVR-import
+henter hele det danske CVR-register (21.000+ leads i skrivende stund, og
+voksende) hver nat; at berige alle dem automatisk ville koste tusindvis af
+kroner for leads, intet menneske nogensinde ser. Den manuelle knap
+begrænser AI-forbrug naturligt til de leads, en operatør rent faktisk åbner
+— samme afvejning som blev truffet for OSINT-signalhentning i Etape 8.
+Spec.md's krav om "batch i baggrundsjob med kø" for masse-berigelse er
+derfor ikke bygget endnu; `lib/ai/berig.ts`s `berigÉtFelt`-funktion er
+skrevet så et fremtidigt kø-job kan genbruge den uden at duplikere
+cache/valideringslogikken, hvis/når det bliver relevant.
+
+**`lib/ai/`** — alle byggeklodserne, hver en ren, testet funktion undtagen
+selve orkestreringen:
+
+- **`pris.ts`** — `AI_MODEL` samt `beregnPrisUsd` (Haiku 4.5-satserne).
+- **`hash.ts`** — `hashInput` (SHA-256 af felttype+prompt), bruges til at
+  slå op i `ai_kald`, før et nyt kald sendes, jf. specens "Samme input må
+  aldrig kaldes to gange."
+- **`skema.ts`** — `validerResumeSvar`/`validerHypoteseSvar`/`validerScoreSvar`
+  plus `parseJsonSvar`. Et svar der ikke består valideringen skriver `null`
+  til feltet og logges som `valideringsfejl` i `ai_kald` — aldrig
+  ustruktureret tekst direkte ind i et databasefelt.
+- **`prompts.ts`** — bygger system+besked-prompts for alle tre felter, med
+  de tre påkrævede regler (kun JSON, skriv `null` frem for at gætte, ingen
+  opdigtede navne/CVR/telefon/e-mail) plus `<materiale>`-indpakning med en
+  eksplicit instruktion om at ignorere instruktioner i det hentede
+  hjemmesideindhold — samme prompt-injection-forsvar som specen kræver, da
+  materialet stammer fra Etape 8's OSINT-scraping af tredjeparts-hjemmesider.
+- **`klient.ts`** — `erAiKonfigureret()`/`opretAiKlient()`. Klienten sættes
+  op med `timeout: 30_000` og `maxRetries: 2`, som dækker specens krav om
+  30-sekunders timeout og eksponentiel backoff-retry via SDK'ens egen
+  indbyggede mekanik, uden at genopfinde den.
+- **`berig.ts`** — `berigLead(supabase, leadId)`: tjekker konfiguration
+  først, henter seneste "website"-/"jobopslag"-signal (kræver at "Hent
+  signaler" er kørt for leadet først), henter kundens ICP hvis leadet er
+  tildelt en kunde, kalder Claude pr. felt (springer over hvis
+  input-hashen allerede findes med status "ok" i `ai_kald`), og stopper
+  **hele** jobbet ved en vedvarende API-fejl (logger til `fejllog` og
+  `ai_kald`) i stedet for at fortsætte og brænde penge, jf. specens krav.
+
+**Databasefelter:** `leads.ai_resume`, `leads.ai_hypotese`, `leads.ai_score`
+fandtes allerede i skemaet. `leads.ai_score_begrundelse` (text, nullable) er
+ny (2026-08-26) — Spec.md kræver en begrundelse for scoren, men skemaet
+havde ingen kolonne til den. `ai_kald` (omkostningslog: tokens, estimeret
+pris, status, fejl pr. lead+kunde+felttype) og `fejllog` (vedvarende
+fejl) fandtes også allerede, ubrugte indtil nu.
+
+**Testet:** alle rene funktioner i `lib/ai/` har unit-tests (hash, pris,
+skema-validering, prompt-opbygning), samt en test der beviser at
+`berigLead` ikke rører databasen overhovedet, når `ANTHROPIC_API_KEY`
+mangler. `npm run build` og `npm test` er grønne. **Ikke browser-testet
+med et rigtigt klik i denne session** — oprettelse af en midlertidig
+Supabase-testbruger via `execute_sql` blev blokeret af
+tilladelsesklassificeren (skriver adgangskode-hash til `auth.users`).
+UI-delen (knap, felt-visning) er derfor kun verificeret ved kodegennemgang
++ typetjek + build, ikke et faktisk museklik — gør det, når nøglen sættes
+og en rigtig test bliver meningsfuld.
 
 ## Teknisk stack
 

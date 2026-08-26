@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { opretServerKlient } from "@/lib/supabase/server";
 import { PIPELINE_STADIER } from "@/lib/leads/pipeline.ts";
 import { hentSignalerForLead, type EnkeltSignalResultat } from "@/lib/signaler/hentSignaler.ts";
+import { berigLead } from "@/lib/ai/berig.ts";
 
 // Stadier der kun må sættes af den dedikerede forretningslogik (godkendLead,
 // og fremover ringeliste-udfald) - ikke ved et frit klik her. Ellers kan et lead
@@ -131,4 +132,30 @@ export async function hentLeadSignaler(
     website: formaterEnkeltResultat(resultat.website),
     jobopslag: formaterEnkeltResultat(resultat.jobopslag),
   };
+}
+
+// Etape 5 (Spec.md "4" og "4C") - manuel udløsning pr. lead, samme mønster
+// som hentLeadSignaler ovenfor. Bevidst IKKE automatisk for alle leads -
+// se lib/ai/berig.ts for begrundelsen (koster penge pr. kald, og kun
+// leads et menneske rent faktisk kigger på, skal berammes).
+export async function berigLeadMedAi(
+  _forrigeState: { fejl?: string; besked?: string } | null,
+  formData: FormData
+): Promise<{ fejl?: string; besked?: string }> {
+  const leadId = String(formData.get("leadId") ?? "");
+  if (!leadId) return { fejl: "Mangler lead-id." };
+
+  const supabase = await opretServerKlient();
+  const resultat = await berigLead(supabase, leadId);
+
+  revalidatePath(`/leads/${leadId}`);
+
+  if (!resultat.ok) {
+    return { fejl: resultat.fejl };
+  }
+
+  const dele: string[] = [];
+  if (resultat.udfoerte.length > 0) dele.push(`Opdateret: ${resultat.udfoerte.join(", ")}.`);
+  if (resultat.sprunget_over.length > 0) dele.push(`Genbrugt fra tidligere kald: ${resultat.sprunget_over.join(", ")}.`);
+  return { besked: dele.length > 0 ? dele.join(" ") : "Intet at berige." };
 }

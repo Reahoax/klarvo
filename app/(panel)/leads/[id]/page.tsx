@@ -19,6 +19,7 @@ import { erSignalGammelt } from "@/lib/signaler/tidsregler.ts";
 import { godkendLead, opdaterPipelineStatus } from "./actions";
 import { TildelKundeForm } from "./tildel-kunde-form";
 import { HentSignalerKnap } from "./hent-signaler-knap";
+import { BerigMedAiKnap } from "./berig-med-ai-knap";
 
 type Lead = {
   id: string;
@@ -46,6 +47,7 @@ type Lead = {
   ai_resume: string | null;
   ai_hypotese: string | null;
   ai_score: number | null;
+  ai_score_begrundelse: string | null;
   godkendt: boolean;
   status_pipeline: string;
   kilde: string;
@@ -327,10 +329,18 @@ export default async function LeadDetaljeSide({
                 <Sparkles className="h-4 w-4 text-tekst-daempet" strokeWidth={1.75} />
                 AI-felter <span className="text-tekst-daempet">— ikke verificeret</span>
               </h2>
+              <p className="mb-2 text-xs text-tekst-daempet">
+                Kræver at signaler er hentet for leadet først (se "Signaler" nedenfor).
+                AI-score kræver desuden, at leadet er tildelt en kunde med en ICP.
+              </p>
               <div className="flex flex-col gap-2">
                 <Felt label="AI-resumé" vaerdi={lead.ai_resume ?? "Ikke genereret endnu"} />
                 <Felt label="AI-hypotese" vaerdi={lead.ai_hypotese ?? "Ikke genereret endnu"} />
-                <Felt label="AI-score" vaerdi={lead.ai_score} tal />
+                <Felt label="AI-score (1-10)" vaerdi={lead.ai_score} tal />
+                <Felt label="AI-score begrundelse" vaerdi={lead.ai_score_begrundelse ?? "Ikke genereret endnu"} />
+              </div>
+              <div className="mt-2">
+                <BerigMedAiKnap leadId={lead.id} />
               </div>
             </section>
 
